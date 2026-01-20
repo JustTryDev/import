@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { ArrowLeft, Building2, Truck, DollarSign, Factory } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,8 +19,8 @@ import { ShippingRateManager } from "@/components/calculator/admin/ShippingRateM
 import { CompanyCostManager } from "@/components/calculator/admin/CompanyCostManager"
 import { FactoryManager } from "@/components/calculator/admin/FactoryManager"
 
-// 관리자 설정 페이지
-export default function SettingsPage() {
+// 설정 페이지 내용 컴포넌트 (useSearchParams 사용)
+function SettingsContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState("companies")
   const { seedAll, isSeeding } = useSeedData()
@@ -122,5 +122,23 @@ export default function SettingsPage() {
         </Tabs>
       </main>
     </div>
+  )
+}
+
+// 로딩 컴포넌트
+function SettingsLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-gray-500">로딩 중...</div>
+    </div>
+  )
+}
+
+// 메인 페이지 (Suspense로 감싸기)
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsLoading />}>
+      <SettingsContent />
+    </Suspense>
   )
 }

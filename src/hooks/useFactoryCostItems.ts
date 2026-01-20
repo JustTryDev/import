@@ -38,7 +38,9 @@ export function useAllFactoryCostItems() {
 
   // 공장별로 그룹화된 Map 생성
   const costItemsMap = useMemo(() => {
-    const map = new Map<string, typeof allCostItems>()
+    // 배열 아이템 타입 추출 (undefined 제외)
+    type CostItem = NonNullable<typeof allCostItems>[number]
+    const map = new Map<string, CostItem[]>()
     if (!allCostItems) return map
 
     allCostItems.forEach((item) => {

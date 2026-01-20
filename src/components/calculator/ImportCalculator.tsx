@@ -313,7 +313,7 @@ export function ImportCalculator() {
   return (
     <div className="h-screen bg-gray-50">
       {/* 메인 컨텐츠 - 좌우 2단 레이아웃 (50:50) */}
-      <main className="h-full px-[100px] py-3 overflow-hidden">
+      <main className="h-full px-4 py-3 overflow-hidden">
         <div className="h-full grid grid-cols-2 gap-6">
           {/* 좌측: 입력 영역 */}
           <div className="space-y-3 overflow-y-auto pr-2">

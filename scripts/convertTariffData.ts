@@ -269,7 +269,7 @@ function processTariffRateFile(
         unit: null,
       }
 
-      const rateValue = parseRate(rate)
+      const rateValue = parseRate(rate as string | number | undefined)
       const rateTypeStr = parseRateType(String(rateType || ""))
       const countryStr = String(country || "").toUpperCase()
 

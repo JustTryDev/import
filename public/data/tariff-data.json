@@ -1,0 +1,281 @@
+{
+  "metadata": {
+    "version": "2026.01",
+    "source": "공공데이터포털 (data.go.kr)",
+    "description": "HS Code 품목 및 관세율 데이터 (샘플)",
+    "lastUpdated": "2026-01-20",
+    "note": "실제 데이터는 공공데이터포털에서 다운로드 후 변환 필요"
+  },
+  "items": [
+    {
+      "code": "6116100000",
+      "nameKo": "편물제(메리야스편이나 뜨개질편)의 장갑ㆍ미튼 및 미트(플라스틱이나 고무를 침투ㆍ도포ㆍ피복하거나 적층한 것)",
+      "nameEn": "Gloves, mittens and mitts, knitted or crocheted, impregnated, coated, covered or laminated with plastics or rubber",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "PR"
+    },
+    {
+      "code": "6116910000",
+      "nameKo": "그 밖의 편물제 장갑ㆍ미튼 및 미트(양모나 동물의 털로 만든 것)",
+      "nameEn": "Other gloves, mittens and mitts, of wool or fine animal hair",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "PR"
+    },
+    {
+      "code": "6116920000",
+      "nameKo": "그 밖의 편물제 장갑ㆍ미튼 및 미트(면으로 만든 것)",
+      "nameEn": "Other gloves, mittens and mitts, of cotton",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "PR"
+    },
+    {
+      "code": "8517120000",
+      "nameKo": "셀룰러 통신망용이나 그 밖의 무선 통신망용 전화기(스마트폰)",
+      "nameEn": "Telephones for cellular networks or for other wireless networks (Smartphones)",
+      "basicRate": 0,
+      "wtoRate": 0,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8471300000",
+      "nameKo": "휴대용 자동자료처리기계(노트북 컴퓨터)",
+      "nameEn": "Portable automatic data processing machines (Laptops)",
+      "basicRate": 0,
+      "wtoRate": 0,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8528720000",
+      "nameKo": "수신 기기(텔레비전, 모니터)",
+      "nameEn": "Reception apparatus for television (TV, Monitor)",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "6203420000",
+      "nameKo": "남성용 바지(면으로 만든 것)",
+      "nameEn": "Men's trousers, of cotton",
+      "basicRate": 13,
+      "wtoRate": 13,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "6204620000",
+      "nameKo": "여성용 바지(면으로 만든 것)",
+      "nameEn": "Women's trousers, of cotton",
+      "basicRate": 13,
+      "wtoRate": 13,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "6109100000",
+      "nameKo": "티셔츠ㆍ싱글릿(면으로 만든 것)",
+      "nameEn": "T-shirts, singlets, of cotton",
+      "basicRate": 13,
+      "wtoRate": 13,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "6110200000",
+      "nameKo": "스웨터ㆍ풀오버ㆍ카디건(면으로 만든 것)",
+      "nameEn": "Sweaters, pullovers, cardigans, of cotton",
+      "basicRate": 13,
+      "wtoRate": 13,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "6402910000",
+      "nameKo": "그 밖의 신발(고무나 플라스틱으로 된 겉바닥과 갑피를 갖춘 것으로 발목을 덮는 것)",
+      "nameEn": "Other footwear, covering the ankle, with outer soles and uppers of rubber or plastics",
+      "basicRate": 13,
+      "wtoRate": 13,
+      "chinaFtaRate": 8,
+      "unit": "PR"
+    },
+    {
+      "code": "6403990000",
+      "nameKo": "그 밖의 신발(가죽 갑피를 갖춘 것)",
+      "nameEn": "Other footwear with uppers of leather",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "PR"
+    },
+    {
+      "code": "4202210000",
+      "nameKo": "핸드백(가죽이나 콤퍼지션 레더로 겉면을 만든 것)",
+      "nameEn": "Handbags with outer surface of leather",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "4202220000",
+      "nameKo": "핸드백(플라스틱 시트나 방직용 섬유 재료로 겉면을 만든 것)",
+      "nameEn": "Handbags with outer surface of plastic sheeting or textile materials",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "9503000000",
+      "nameKo": "완구(세발자전거ㆍ스쿠터ㆍ페달 자동차와 이와 유사한 바퀴가 달린 완구 포함)",
+      "nameEn": "Toys (tricycles, scooters, pedal cars and similar wheeled toys)",
+      "basicRate": 0,
+      "wtoRate": 0,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "9504500000",
+      "nameKo": "비디오 게임용 콘솔과 기기",
+      "nameEn": "Video game consoles and machines",
+      "basicRate": 0,
+      "wtoRate": 0,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8516600000",
+      "nameKo": "전기오븐ㆍ전기레인지ㆍ전기조리판과 전기그릴",
+      "nameEn": "Electric ovens, cookers, cooking plates and grills",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8516710000",
+      "nameKo": "커피메이커ㆍ티메이커",
+      "nameEn": "Coffee or tea makers",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8509400000",
+      "nameKo": "식품 분쇄기와 믹서, 과실 주스 추출기",
+      "nameEn": "Food grinders and mixers, fruit or vegetable juice extractors",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8508110000",
+      "nameKo": "진공청소기(출력 1,500와트 이하로 먼지봉투나 그 밖의 집진기의 용량이 20리터 이하인 것)",
+      "nameEn": "Vacuum cleaners with self-contained electric motor, of a power not exceeding 1,500 W",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "3304990000",
+      "nameKo": "그 밖의 미용이나 메이크업용 제품류와 기초화장용 제품류(의약품 제외)",
+      "nameEn": "Other beauty or make-up preparations and preparations for the care of the skin",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 6.4,
+      "unit": "KG"
+    },
+    {
+      "code": "3305100000",
+      "nameKo": "샴푸",
+      "nameEn": "Shampoos",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "KG"
+    },
+    {
+      "code": "7117190000",
+      "nameKo": "그 밖의 모조 신변장식용품(비금속으로 만든 것)",
+      "nameEn": "Other imitation jewellery, of base metal",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "KG"
+    },
+    {
+      "code": "9102190000",
+      "nameKo": "그 밖의 손목시계(전기식인 것)",
+      "nameEn": "Other wrist watches, electrically operated",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8518210000",
+      "nameKo": "단일 확성기(이어폰, 헤드폰)",
+      "nameEn": "Single loudspeakers (earphones, headphones)",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "8504400000",
+      "nameKo": "정류기(충전기 포함)",
+      "nameEn": "Static converters (chargers)",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "3926909000",
+      "nameKo": "그 밖의 플라스틱 제품과 제3901호부터 제3914호까지의 재료로 만든 제품",
+      "nameEn": "Other articles of plastics",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "KG"
+    },
+    {
+      "code": "8544421000",
+      "nameKo": "접속자가 부착된 전기도체(USB 케이블 등)",
+      "nameEn": "Electric conductors, fitted with connectors (USB cables)",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "KG"
+    },
+    {
+      "code": "9405420000",
+      "nameKo": "그 밖의 전기식 램프와 조명기구(발광다이오드(LED)를 사용하는 것)",
+      "nameEn": "Other electric lamps and lighting fittings using LED",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
+      "code": "9401710000",
+      "nameKo": "의자(속을 채운 것으로 금속 프레임을 갖춘 것)",
+      "nameEn": "Upholstered seats with metal frames",
+      "basicRate": 8,
+      "wtoRate": 8,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    }
+  ]
+}

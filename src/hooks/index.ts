@@ -29,3 +29,11 @@ export { useCountUp } from "./useCountUp"
 
 // 스크롤 애니메이션: 요소가 화면에 보이면 애니메이션 시작
 export { useScrollAnimation } from "./useScrollAnimation"
+
+// ==================== API 관련 훅 ====================
+
+// 환율 조회: 한국수출입은행 API에서 환율 데이터 가져오기
+export { useExchangeRate } from "./useExchangeRate"
+
+// 관세 검색: HS Code 또는 품목명으로 관세 정보 검색
+export { useTariffSearch } from "./useTariffSearch"

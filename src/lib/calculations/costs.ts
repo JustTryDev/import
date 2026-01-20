@@ -76,7 +76,7 @@ export function calculate3PLVat(threePLCost: number): number {
 
 // 부대 비용 항목 입력
 export interface AdditionalCostInput {
-  id: Id<"additionalCostItems">
+  id: Id<"factoryCostItems">
   name: string
   amount: number
 }

@@ -5,4 +5,5 @@
 export { ShippingCompanyManager } from "./ShippingCompanyManager"
 export { ShippingRateManager } from "./ShippingRateManager"
 export { CompanyCostManager } from "./CompanyCostManager"
-export { AdditionalCostManager } from "./AdditionalCostManager"
+export { FactoryManager } from "./FactoryManager"
+export { SettingsModal } from "./SettingsModal"

@@ -6,13 +6,8 @@
  * 하나의 페이지에서 완료할 수 있습니다.
  */
 
-import UnifiedCalculator from "@/components/UnifiedCalculator"
+import { ImportCalculator } from "@/components/calculator"
 
 export default function Home() {
-  return (
-    <main className="min-h-screen bg-gray-50">
-      {/* 통합 수입원가 계산기 */}
-      <UnifiedCalculator />
-    </main>
-  )
+  return <ImportCalculator />
 }

@@ -37,6 +37,15 @@ export interface ExchangeRates {
   CNY: ExchangeRate
 }
 
+/**
+ * 일별 환율 정보 (히스토리용)
+ */
+export interface DailyRate {
+  date: string      // YYYY-MM-DD (한국 시간)
+  usdRate: number   // USD 환율
+  cnyRate: number   // CNY 환율
+}
+
 // ==========================================
 // API 응답 타입
 // ==========================================
@@ -50,7 +59,9 @@ export interface ExchangeRates {
  */
 export interface ExchangeRateResponse {
   success: boolean
-  data?: ExchangeRates
+  data?: ExchangeRates & {
+    history: DailyRate[]  // 최근 5일 환율 히스토리
+  }
   error?: {
     code: string // 에러 코드 (개발자용)
     message: string // 에러 메시지 (사용자용)
@@ -99,6 +110,7 @@ export interface ExchangeCalculatorProps {
  */
 export interface UseExchangeRateReturn {
   rates: ExchangeRates | null // 환율 데이터 (로딩 중이면 null)
+  history: DailyRate[] // 최근 5일 환율 히스토리
   isLoading: boolean // 로딩 중 여부
   error: string | null // 에러 메시지 (없으면 null)
   refetch: () => Promise<void> // 데이터 새로고침 함수

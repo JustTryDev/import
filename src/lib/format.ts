@@ -133,6 +133,55 @@ export function formatPhoneNumber(phone: string): string {
   return cleaned.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3")
 }
 
+// ==================== 숫자 포맷팅 ====================
+
+/**
+ * 숫자에 천 단위 콤마 추가
+ *
+ * @param num - 숫자
+ * @returns "1,234,567" 형식의 문자열
+ *
+ * @example
+ * formatNumberWithCommas(1234567)  // "1,234,567"
+ * formatNumberWithCommas(0)        // "0"
+ */
+export function formatNumberWithCommas(num: number): string {
+  return num.toLocaleString("ko-KR")
+}
+
+/**
+ * 외화 금액에 천 단위 콤마 추가 (소수점 2자리)
+ *
+ * @param num - 외화 금액
+ * @returns "1,234.56" 형식의 문자열
+ *
+ * @example
+ * formatForeignCurrency(1234.5)   // "1,234.50"
+ * formatForeignCurrency(0)        // "0.00"
+ */
+export function formatForeignCurrency(num: number): string {
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+/**
+ * 콤마가 포함된 문자열을 숫자로 변환
+ *
+ * @param str - 콤마가 포함된 숫자 문자열
+ * @returns 숫자
+ *
+ * @example
+ * parseFormattedNumber("1,234,567")  // 1234567
+ * parseFormattedNumber("0")          // 0
+ */
+export function parseFormattedNumber(str: string): number {
+  const cleaned = str.replace(/,/g, "")
+  const num = Number(cleaned)
+  return isNaN(num) ? 0 : num
+}
+
 // ==================== 금액 포맷팅 ====================
 
 /**

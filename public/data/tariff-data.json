@@ -8,6 +8,15 @@
   },
   "items": [
     {
+      "code": "9503003411",
+      "nameKo": "봉제 인형(방직용 섬유 재료로 만든 것)",
+      "nameEn": "Stuffed toys of textile materials",
+      "basicRate": 13,
+      "wtoRate": 13,
+      "chinaFtaRate": 0,
+      "unit": "EA"
+    },
+    {
       "code": "6116100000",
       "nameKo": "편물제(메리야스편이나 뜨개질편)의 장갑ㆍ미튼 및 미트(플라스틱이나 고무를 침투ㆍ도포ㆍ피복하거나 적층한 것)",
       "nameEn": "Gloves, mittens and mitts, knitted or crocheted, impregnated, coated, covered or laminated with plastics or rubber",

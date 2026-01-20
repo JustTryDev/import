@@ -458,7 +458,7 @@ export default function UnifiedCalculator() {
             {/* 개당 원가 입력 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                개당 원가 ({currencyName})
+                단가 ({currencyName})
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">

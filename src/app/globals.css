@@ -7,10 +7,10 @@
   /* ========================================
      📌 브랜드 컬러 설정 - 이 부분만 수정하세요!
      ======================================== */
-  /* 토스 블루 (기본값) - 다른 색상으로 변경 가능 */
-  --color-primary: #3182F6;
-  --color-primary-light: #5B9CF6;
-  --color-primary-dark: #1B64DA;
+  /* 블랙 테마 */
+  --color-primary: #111827;
+  --color-primary-light: #374151;
+  --color-primary-dark: #030712;
   --radius: 0.625rem;
 
   /* ========================================
@@ -23,8 +23,8 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
 
-  /* Primary 색상 - 브랜드 컬러와 연동 (토스 블루의 OKLCH 값) */
-  --primary: oklch(0.55 0.2 250);
+  /* Primary 색상 - 브랜드 컬러와 연동 (블랙 테마) */
+  --primary: oklch(0.145 0 0);
   --primary-foreground: oklch(1 0 0);
 
   --secondary: oklch(0.97 0 0);
@@ -36,7 +36,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.55 0.2 250);
+  --ring: oklch(0.145 0 0);
 
   /* Chart 색상 */
   --chart-1: oklch(0.646 0.222 41.116);
@@ -48,7 +48,7 @@
   /* Sidebar 색상 */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.55 0.2 250);
+  --sidebar-primary: oklch(0.145 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -107,8 +107,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.6 0.2 250);
-  --primary-foreground: oklch(1 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -118,7 +118,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.55 0.2 250);
+  --ring: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -323,7 +323,7 @@ input[type="number"] {
 
 .btn-primary-enhanced:hover:not(:disabled) {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(49, 130, 246, 0.35);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.35);
 }
 
 /* ========================================

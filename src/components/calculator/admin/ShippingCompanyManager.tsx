@@ -22,7 +22,6 @@ export function ShippingCompanyManager() {
     await createCompany({
       name: newName.trim(),
       description: newDescription.trim() || undefined,
-      isActive: true,
     })
     setNewName("")
     setNewDescription("")

@@ -115,6 +115,40 @@ export function useTariffSearch(): UseTariffSearchReturn {
   )
 
   /**
+   * 인기 품목 가져오기
+   *
+   * 📌 언제 사용하나요?
+   * 검색창을 클릭했을 때 (아직 아무것도 입력 안 한 상태),
+   * 사용자에게 미리 품목 목록을 보여줄 때 사용합니다.
+   *
+   * 비유: 유튜브 검색창을 클릭하면 "추천 검색어"가 뜨는 것처럼,
+   * 검색 전에 미리 인기 품목을 보여줍니다.
+   */
+  const fetchPopular = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // popular=true 파라미터로 인기 품목 요청
+      const response = await fetch("/api/tariff/search?popular=true")
+      const data: TariffSearchResponse = await response.json()
+
+      if (data.success && data.data) {
+        setResults(data.data)
+      } else {
+        setError(data.error?.message || "품목을 불러오는 중 오류가 발생했습니다.")
+        setResults([])
+      }
+    } catch (err) {
+      console.error("인기 품목 로드 실패:", err)
+      setError("네트워크 오류가 발생했습니다.")
+      setResults([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  /**
    * 검색 결과 초기화
    */
   const clear = useCallback(() => {
@@ -135,6 +169,7 @@ export function useTariffSearch(): UseTariffSearchReturn {
     isLoading, // 로딩 중 여부
     error, // 에러 메시지
     search, // 검색 함수
+    fetchPopular, // 인기 품목 가져오기 함수
     clear, // 결과 초기화 함수
   }
 }

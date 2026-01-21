@@ -91,15 +91,41 @@ function searchByName(query: string, items: TariffDataItem[]): HsCodeWithTariff[
  * GET 요청 처리
  *
  * 쿼리 파라미터:
- * - q: 검색어 (필수) - HS Code 또는 품목명
+ * - q: 검색어 (선택) - HS Code 또는 품목명
+ * - popular: "true"이면 인기 품목 반환 (검색어 없이 사용)
  */
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<TariffSearchResponse>> {
   try {
-    // 1. 검색어 추출
+    // 1. 파라미터 추출
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get("q")
+    const isPopular = searchParams.get("popular") === "true"
+
+    // 2. 데이터 로드 (인기 품목 요청이거나 검색 시 모두 필요)
+    const tariffData = loadTariffData()
+    const items: TariffDataItem[] = tariffData.items
+
+    // 📌 인기 품목 요청 처리
+    // 비유: 검색창 클릭 시 "추천 검색어"를 보여주는 것처럼
+    // 자주 사용되는 품목을 미리 보여줍니다.
+    if (isPopular) {
+      const popularItems = items.slice(0, MAX_RESULTS).map((item) => ({
+        code: item.code,
+        nameKo: item.nameKo,
+        nameEn: item.nameEn,
+        basicRate: item.basicRate,
+        wtoRate: item.wtoRate,
+        chinaFtaRate: item.chinaFtaRate,
+      }))
+
+      return NextResponse.json({
+        success: true,
+        data: popularItems,
+        totalCount: popularItems.length,
+      })
+    }
 
     // 검색어가 없으면 에러
     if (!query || query.trim().length === 0) {
@@ -130,10 +156,6 @@ export async function GET(
         { status: 400 }
       )
     }
-
-    // 2. 데이터 로드
-    const tariffData = loadTariffData()
-    const items: TariffDataItem[] = tariffData.items
 
     // 3. 검색 실행
     let results: HsCodeWithTariff[]

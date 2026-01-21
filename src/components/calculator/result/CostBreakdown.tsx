@@ -123,7 +123,7 @@ function RemittanceFeeRow({
   return (
     <div className="flex justify-between items-center py-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-600">송금 수수료</span>
+        <span className="text-sm text-gray-600">송금 & 결제 수수료</span>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
           isWireTransfer
             ? "bg-gray-900 text-white"

@@ -174,6 +174,7 @@ export interface UseTariffSearchReturn {
   isLoading: boolean                 // 로딩 중 여부
   error: string | null               // 에러 메시지
   search: (query: string) => void    // 검색 함수
+  fetchPopular: () => Promise<void>  // 인기 품목 가져오기
   clear: () => void                  // 결과 초기화
 }
 

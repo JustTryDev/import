@@ -36,7 +36,6 @@ import { FactorySlot, createEmptySlots } from "./input/AdditionalCostInput"
 
 // 결과 컴포넌트
 import {
-  TotalCostCard,
   ExchangeRateDisplay,
   MultiProductCostBreakdown,
 } from "./result"
@@ -97,8 +96,8 @@ export function ImportCalculator() {
   // ===== 업체별 공통 비용 =====
   const { items: companyCostItems, isLoading: companyCostsLoading } = useCompanyCosts(selectedCompanyId)
   const [selectedCompanyCostIds, setSelectedCompanyCostIds] = useState<Id<"companyCostItems">[]>([])
-  // 주문 건수: 기본값 = 제품 개수, 수동 조절 가능
-  const [orderCount, setOrderCount] = useState<number>(1)
+  // 주문 건수: 기본값 = 2, 제품 추가 시 +1씩 증가 (수동 조절 가능)
+  const [orderCount, setOrderCount] = useState<number>(2)
 
   // 제품 개수가 변경되면 주문 건수 자동 업데이트 (사용자가 수동 조절하지 않은 경우)
   const [isOrderCountManual, setIsOrderCountManual] = useState(false)
@@ -178,7 +177,8 @@ export function ImportCalculator() {
   // 📌 비유: 장바구니에 상품을 담으면 자동으로 배송비 계산 단위가 업데이트되는 것
   useEffect(() => {
     if (!isOrderCountManual) {
-      setOrderCount(products.length)
+      // 제품 개수 + 1 (기본값 2를 기반으로)
+      setOrderCount(products.length + 1)
     }
   }, [products.length, isOrderCountManual])
 
@@ -238,7 +238,8 @@ export function ImportCalculator() {
                 name: item.name,
                 unitAmount: slot.costValues[itemId] ?? 0,
                 quantity: slot.quantityValues?.[itemId] ?? 1,
-                chargeType: (item.chargeType ?? "once") as "once" | "per_quantity",
+                // 과금 방식: 프론트 오버라이드 → DB 기본값 → "once"
+                chargeType: (slot.chargeTypeValues?.[itemId] ?? item.chargeType ?? "once") as "once" | "per_quantity",
               }
             })
             .filter((item): item is NonNullable<typeof item> => item !== null),
@@ -313,6 +314,7 @@ export function ImportCalculator() {
       factoryId: slot.factoryId as Id<"factories"> | null,
       selectedItemIds: slot.selectedItemIds,
       costValues: slot.costValues as { [itemId: string]: number },
+      chargeTypeValues: slot.chargeTypeValues as { [itemId: string]: "once" | "per_quantity" } | undefined,
     }))
 
     // 최소 2개 슬롯 보장
@@ -321,6 +323,7 @@ export function ImportCalculator() {
         factoryId: null,
         selectedItemIds: [],
         costValues: {},
+        chargeTypeValues: {},
       })
     }
 
@@ -337,6 +340,7 @@ export function ImportCalculator() {
         factoryId: slot.factoryId as string,
         selectedItemIds: slot.selectedItemIds,
         costValues: slot.costValues,
+        chargeTypeValues: slot.chargeTypeValues,
       }))
 
     const newPresetId = await createPreset({ name, slots: slotsToSave })
@@ -420,14 +424,6 @@ export function ImportCalculator() {
 
           {/* 우측: 결과 영역 */}
           <div className="space-y-3 overflow-y-auto">
-            {/* 총 수입원가 */}
-            <TotalCostCard
-              totalCost={calculationResult?.totalCost ?? null}
-              unitCost={null}  // 다중 제품에서는 개당 단가 대신 제품별 단가 표시
-              quantity={totalQuantity}
-              productCount={products.length}
-            />
-
             {/* 비용 상세 내역 (다중 제품용) */}
             <MultiProductCostBreakdown
               result={calculationResult}
@@ -440,6 +436,7 @@ export function ImportCalculator() {
                 domestic: domesticConfig,
                 threePL: threePLConfig,
               }}
+              orderCount={orderCount}
             />
           </div>
         </div>

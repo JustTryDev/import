@@ -146,7 +146,8 @@ export function calculateMultiProductImportCost(
     // 관세 계산 (공장 비용은 아직 모르므로 제품가격만으로 계산)
     // 실제로는 공장 비용 분배 후 다시 계산해야 함
     const { taxableBase, tariffAmount } = calculateTariff(productPriceKRW, 0, tariffRate)
-    const { vatAmount } = calculateVat(taxableBase, tariffAmount)
+    // 부가세는 내륙운송료가 확정된 후 재계산 (여기서는 0으로 임시 계산)
+    const { vatAmount } = calculateVat(taxableBase, 0)
 
     return {
       ...product,
@@ -164,9 +165,12 @@ export function calculateMultiProductImportCost(
     exchangeRates
   )
 
-  // 제품별 공장비용 맵 생성
+  // 제품별 공장비용 맵 생성 (총액 + 상세)
   const factoryCostMap = new Map(
-    factoryCostResults.map(r => [r.productId, r.totalCostKRW])
+    factoryCostResults.map(r => [r.productId, {
+      totalCostKRW: r.totalCostKRW,
+      details: r.details,
+    }])
   )
 
   // ===== 4. 공통 비용 계산 (총 CBM 기준) =====
@@ -215,7 +219,8 @@ export function calculateMultiProductImportCost(
 
   // ===== 6. 제품별 총 비용 및 개당 단가 계산 =====
   const productResults: ProductCalculationResult[] = productsWithTariff.map(product => {
-    const factoryCost = factoryCostMap.get(product.id) ?? 0
+    const factoryCostData = factoryCostMap.get(product.id) ?? { totalCostKRW: 0, details: [] }
+    const factoryCost = factoryCostData.totalCostKRW
     const sharedCosts = sharedCostsDistribution.get(product.id)!
 
     // 관세 재계산 (공장비용 포함)
@@ -224,7 +229,8 @@ export function calculateMultiProductImportCost(
       factoryCost,  // 공장비용을 부대비용으로 포함
       product.tariffRate
     )
-    const { vatAmount } = calculateVat(taxableBase, tariffAmount)
+    // 부가세 계산: (제품가격 + 공장비용 + 내륙운송료) × 10% (관세 제외!)
+    const { vatAmount } = calculateVat(taxableBase, sharedCosts.inlandShipping)
 
     // CBM 비율에 따른 국내 관련 부가세 분배
     const domesticVat = Math.round(
@@ -256,6 +262,16 @@ export function calculateMultiProductImportCost(
     // 개당 수입원가
     const unitCost = Math.round(totalCost / product.quantity)
 
+    // 공장 비용 상세 변환 (ProductCalculationResult 형식에 맞게)
+    const factoryCostsDetail = factoryCostData.details.map(d => ({
+      factoryName: d.factoryName,
+      itemName: d.itemName,
+      chargeType: d.chargeType,
+      amountKRW: d.distributedAmount,
+      amountForeign: d.distributedAmountForeign,
+      currency: d.currency,
+    }))
+
     return {
       productId: product.id,
       productName: product.name,
@@ -267,6 +283,7 @@ export function calculateMultiProductImportCost(
       tariffAmount,
       vatAmount,
       factoryCostsTotal: factoryCost,
+      factoryCostsDetail,  // 공장 비용 상세 추가
       sharedCosts: {
         inlandShipping: sharedCosts.inlandShipping,
         internationalShipping: sharedCosts.internationalShipping,

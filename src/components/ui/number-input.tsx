@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { ChevronUp, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -48,31 +48,75 @@ export function NumberInput({
   // 포커스 상태 (버튼 표시용)
   const [isFocused, setIsFocused] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  // 입력 중인 원시 문자열 (소수점 입력 유지용)
+  const [rawInput, setRawInput] = useState<string>("")
 
   // 숫자 파싱 (빈 문자열이면 0)
   const numValue = typeof value === "string"
     ? parseFloat(value.replace(/,/g, "")) || 0
     : value
 
+  // 외부 value 변경 시 rawInput 초기화 (포커스 아닐 때만)
+  useEffect(() => {
+    if (!isFocused) {
+      setRawInput("")
+    }
+  }, [value, isFocused])
+
   // 증가
   const handleIncrement = useCallback(() => {
     const newValue = Math.min(numValue + step, max)
+    setRawInput("")  // 버튼 클릭 시 raw 초기화
     onChange(decimal > 0 ? newValue.toFixed(decimal) : String(newValue))
   }, [numValue, step, max, decimal, onChange])
 
   // 감소
   const handleDecrement = useCallback(() => {
     const newValue = Math.max(numValue - step, min)
+    setRawInput("")  // 버튼 클릭 시 raw 초기화
     onChange(decimal > 0 ? newValue.toFixed(decimal) : String(newValue))
   }, [numValue, step, min, decimal, onChange])
 
-  // 표시값 포맷팅
-  const displayValue = numValue > 0
-    ? numValue.toLocaleString(undefined, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: decimal,
-      })
-    : ""
+  // 입력값 변경 핸들러
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    // 콤마 제거 후 숫자와 소수점만 허용
+    const cleaned = inputValue.replace(/,/g, "").replace(/[^0-9.]/g, "")
+
+    // 소수점이 여러 개면 첫 번째만 유지
+    const parts = cleaned.split(".")
+    let result = parts[0]
+    if (parts.length > 1 && decimal > 0) {
+      // 소수점 자릿수 제한
+      result = parts[0] + "." + parts[1].slice(0, decimal)
+    }
+
+    // 최대값 검사
+    const numResult = parseFloat(result) || 0
+    if (numResult > max) {
+      result = String(max)
+    }
+
+    // 소수점 입력 중인 상태 보존 (예: "12." 또는 "12.0")
+    setRawInput(result)
+    onChange(result)
+  }, [decimal, max, onChange])
+
+  // 포커스 잃을 때 값 정리
+  const handleBlur = useCallback(() => {
+    setIsFocused(false)
+    setRawInput("")  // 포커스 잃으면 raw 초기화
+  }, [])
+
+  // 표시값 결정: 포커스 중이고 rawInput이 있으면 rawInput 사용
+  const displayValue = isFocused && rawInput !== ""
+    ? rawInput
+    : numValue > 0
+      ? numValue.toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: decimal,
+        })
+      : ""
 
   // 크기별 스타일
   const sizeStyles = {
@@ -114,9 +158,9 @@ export function NumberInput({
         inputMode="decimal"
         placeholder={placeholder}
         value={displayValue}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleInputChange}
         onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        onBlur={handleBlur}
         className={cn(
           "w-full border border-gray-200 rounded-md outline-none transition-all",
           "focus:ring-2 focus:ring-primary/30 focus:border-primary/50",

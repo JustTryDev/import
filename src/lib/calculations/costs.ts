@@ -105,18 +105,18 @@ export function calculateTariff(
   return { taxableBase, tariffAmount }
 }
 
-// 부가세 계산
-// 부가세 과세가격 = 관세 과세기준 + 관세
+// 부가세 계산 (국외 부가세)
+// 부가세 과세가격 = 제품가격 + 부대비용 + 내륙운송료 (관세 제외)
 // 부가세 = 부가세 과세가격 x 10%
 export function calculateVat(
-  taxableBase: number,
-  tariffAmount: number
+  taxableBase: number,    // 제품가격 + 부대비용
+  inlandShipping: number  // 내륙운송료
 ): {
   vatBase: number
   vatAmount: number
 } {
-  // 부가세 과세 기준 = 관세 과세기준 + 관세
-  const vatBase = taxableBase + tariffAmount
+  // 부가세 과세 기준 = 제품가격 + 부대비용 + 내륙운송료 (관세 제외!)
+  const vatBase = taxableBase + inlandShipping
   // 부가세 = 과세 기준 x 10%
   const vatAmount = Math.round(vatBase * 0.1)
 
@@ -153,6 +153,8 @@ export interface ProductFactoryCostResult {
     chargeType: "once" | "per_quantity"
     totalAmount: number                 // 항목별 총 금액 (원화)
     distributedAmount: number           // 분배 후 금액 (원화)
+    distributedAmountForeign: number    // 분배 후 금액 (외화)
+    currency: "USD" | "CNY"             // 통화
   }[]
 }
 
@@ -219,6 +221,7 @@ export function calculateFactoryCostsByProduct(
 
       // 균등 분배
       const perProductAmount = Math.round(totalAmountKRW / linkedProducts.length)
+      const perProductAmountForeign = totalAmountForeign / linkedProducts.length
 
       // 각 연결된 제품에 비용 분배
       linkedProducts.forEach(product => {
@@ -231,6 +234,8 @@ export function calculateFactoryCostsByProduct(
             chargeType: item.chargeType,
             totalAmount: totalAmountKRW,
             distributedAmount: perProductAmount,
+            distributedAmountForeign: perProductAmountForeign,
+            currency: slot.currency as "USD" | "CNY",
           })
         }
       })

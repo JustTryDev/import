@@ -157,7 +157,8 @@ export function ProductCard({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (!target.closest(`[data-product-search-${product.id}]`)) {
+      // data-product-search="product.id" 형태로 설정된 속성을 찾음
+      if (!target.closest(`[data-product-search="${product.id}"]`)) {
         setIsSearchOpen(false)
       }
     }
@@ -258,16 +259,27 @@ export function ProductCard({
           <div data-product-search={product.id}>
             {product.hsCode ? (
               // 선택된 품목 표시
-              <div className="bg-primary/5 border border-primary/30 rounded-lg p-2">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                        {product.hsCode.code}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    {/* HS CODE + FTA 배지 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">
+                        HS CODE : <span className="font-mono text-gray-700">{product.hsCode.code}</span>
                       </span>
+                      {product.hsCode.chinaFtaRate !== null && product.hsCode.chinaFtaRate < product.hsCode.basicRate && (
+                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                          한-중 FTA
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-700 line-clamp-1">
+                    {/* 품목명 */}
+                    <p className="text-sm text-gray-800 line-clamp-1">
                       {product.hsCode.nameKo}
+                    </p>
+                    {/* 관세율 정보 */}
+                    <p className="text-xs text-gray-400">
+                      기본 {product.hsCode.basicRate}% / 한-중 FTA {product.hsCode.chinaFtaRate ?? 0}%
                     </p>
                   </div>
                   <button
@@ -275,7 +287,7 @@ export function ProductCard({
                     onClick={handleClearHsCode}
                     className="p-1 hover:bg-gray-200 rounded transition-colors"
                   >
-                    <X className="h-3 w-3 text-gray-500" />
+                    <X className="h-3.5 w-3.5 text-gray-400" />
                   </button>
                 </div>
               </div>
@@ -300,7 +312,7 @@ export function ProductCard({
 
                 {/* 검색 결과 드롭다운 */}
                 {isSearchOpen && (searchResults.length > 0 || isSearchLoading) && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 max-h-48 overflow-y-auto z-20">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto z-20">
                     {isSearchLoading ? (
                       <div className="p-2 space-y-2">
                         <Skeleton className="h-8 rounded" />
@@ -312,19 +324,25 @@ export function ProductCard({
                           key={item.code}
                           type="button"
                           onClick={() => handleSelectProduct(item)}
-                          className="w-full p-2 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
+                          className="w-full p-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                         >
+                          {/* HS CODE + FTA 배지 */}
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1 py-0.5 rounded">
-                              {item.code}
+                            <span className="text-xs text-gray-500">
+                              HS CODE : <span className="font-mono text-gray-700">{item.code}</span>
                             </span>
                             {item.chinaFtaRate !== null && item.chinaFtaRate < item.basicRate && (
-                              <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">
-                                FTA
+                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                한-중 FTA
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-700 line-clamp-1 mt-0.5">{item.nameKo}</p>
+                          {/* 품목명 */}
+                          <p className="text-sm text-gray-800 line-clamp-1 mt-1">{item.nameKo}</p>
+                          {/* 관세율 정보 */}
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            기본 {item.basicRate}% / 한-중 FTA {item.chinaFtaRate ?? 0}%
+                          </p>
                         </button>
                       ))
                     )}
@@ -523,7 +541,19 @@ export function ProductCard({
   )
 }
 
-// 빈 제품 생성 함수
+// 봉제 인형 기본 HS코드 (HS 9503.00-4100)
+// - 기본 관세율: 8%
+// - FTA 적용 시: 0%
+const DEFAULT_HS_CODE: HsCodeWithTariff = {
+  code: "9503.00-4100",
+  nameKo: "봉제 인형",
+  nameEn: "Stuffed toys",
+  basicRate: 8,
+  wtoRate: 8,
+  chinaFtaRate: 0,
+}
+
+// 빈 제품 생성 함수 (기본값: 봉제 인형)
 export function createEmptyProduct(id: string): Product {
   return {
     id,
@@ -532,9 +562,9 @@ export function createEmptyProduct(id: string): Product {
     currency: "CNY",  // 기본값: 중국 위안화 (중국 공장이 대부분)
     quantity: 0,
     dimensions: { width: 10, height: 10, depth: 10 },
-    hsCode: null,
-    basicTariffRate: 0,
-    ftaTariffRate: 0,
+    hsCode: DEFAULT_HS_CODE,  // 기본값: 봉제 인형
+    basicTariffRate: DEFAULT_HS_CODE.basicRate,
+    ftaTariffRate: DEFAULT_HS_CODE.chinaFtaRate ?? 0,
     useFta: true,  // 기본값: FTA 적용
   }
 }

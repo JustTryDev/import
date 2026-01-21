@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { formatNumberWithCommas } from "@/lib/format"
 import { Id } from "../../../../convex/_generated/dataModel"
 import { CompanyCostItem } from "@/types/shipping"
+import { ChevronUp, ChevronDown } from "lucide-react"
 
 interface CompanyCostSelectorProps {
   items: CompanyCostItem[] | undefined
@@ -38,6 +39,18 @@ export function CompanyCostSelector({
   const handleOrderCountChange = (value: string) => {
     const num = parseInt(value.replace(/[^0-9]/g, ""), 10)
     setOrderCount(isNaN(num) || num < 1 ? 1 : num)
+  }
+
+  // 주문 건수 증가
+  const handleIncrement = () => {
+    setOrderCount(orderCount + 1)
+  }
+
+  // 주문 건수 감소 (최소 1)
+  const handleDecrement = () => {
+    if (orderCount > 1) {
+      setOrderCount(orderCount - 1)
+    }
   }
 
   if (isLoading || !items) {
@@ -108,14 +121,33 @@ export function CompanyCostSelector({
           <Label htmlFor="orderCount" className="text-xs text-gray-500 truncate min-w-0">
             주문 수
           </Label>
-          <Input
-            id="orderCount"
-            type="text"
-            inputMode="numeric"
-            value={orderCount}
-            onChange={(e) => handleOrderCountChange(e.target.value)}
-            className="w-16 text-center h-8 shrink-0"
-          />
+          <div className="relative shrink-0">
+            <Input
+              id="orderCount"
+              type="text"
+              inputMode="numeric"
+              value={orderCount}
+              onChange={(e) => handleOrderCountChange(e.target.value)}
+              className="w-16 text-center h-8 pr-6"
+            />
+            {/* 상하 화살표 버튼 */}
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5">
+              <button
+                type="button"
+                onClick={handleIncrement}
+                className="h-3 w-4 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+              >
+                <ChevronUp className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={handleDecrement}
+                className="h-3 w-4 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

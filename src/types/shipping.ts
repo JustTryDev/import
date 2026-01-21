@@ -33,6 +33,7 @@ export interface FactorySlot {
   costValues: { [itemId: string]: number }  // 각 항목별 금액 (조절 가능)
   quantityValues: { [itemId: string]: number }  // 각 항목별 수량 (수량연동용)
   linkedProductIds: string[]          // 연결된 제품 ID 목록 (균등 분배용)
+  chargeTypeValues?: { [itemId: string]: "once" | "per_quantity" }  // 과금 방식 오버라이드
 }
 
 // 공장 비용 항목 (chargeType 포함)
@@ -272,6 +273,14 @@ export interface ProductCalculationResult {
 
   // 공장 비용 (균등 분배 후)
   factoryCostsTotal: number       // 공장비용 합계
+  factoryCostsDetail?: {          // 공장비용 상세 항목
+    factoryName: string           // 공장명
+    itemName: string              // 항목명 (Sticker, Label, Tag 등)
+    chargeType: "once" | "per_quantity"  // 부과 방식
+    amountKRW: number             // 분배된 금액 (원화)
+    amountForeign: number         // 분배된 금액 (외화)
+    currency: "USD" | "CNY"       // 통화
+  }[]
 
   // 공통 비용 분배 (CBM 비율)
   sharedCosts: {

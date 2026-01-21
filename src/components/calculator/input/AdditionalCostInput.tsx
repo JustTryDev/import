@@ -23,6 +23,7 @@ export interface FactoryCostItem {
   factoryId: Id<"factories">
   name: string
   amount: number
+  chargeType?: "once" | "per_quantity"  // 1회성 vs 수량별
 }
 
 // 공장 슬롯 타입
@@ -33,6 +34,8 @@ export interface FactorySlot {
   // 다중 제품 지원용
   quantityValues?: { [itemId: string]: number } // 수량 값 (수량연동 항목용)
   linkedProductIds?: string[] // 연결된 제품 ID 목록 (비용 분배용)
+  // 과금 방식 오버라이드 (프론트에서 설정)
+  chargeTypeValues?: { [itemId: string]: "once" | "per_quantity" }
 }
 
 // 공장 타입
@@ -78,6 +81,8 @@ function FactorySlotInput({
   // 다중 제품 연결용
   products,
   onLinkedProductsChange,
+  // 과금 방식 토글
+  onChargeTypeToggle,
 }: {
   slotIndex: number
   slot: FactorySlot
@@ -94,6 +99,8 @@ function FactorySlotInput({
   // 다중 제품 연결용
   products?: Product[]
   onLinkedProductsChange?: (productIds: string[]) => void
+  // 과금 방식 토글
+  onChargeTypeToggle?: (itemId: string) => void
 }) {
   // 금액 표시
   const getDisplayValue = (itemId: string): string => {
@@ -106,7 +113,8 @@ function FactorySlotInput({
   const handleProductLinkToggle = (productId: string, checked: boolean) => {
     if (!onLinkedProductsChange) return
 
-    const currentLinked = slot.linkedProductIds ?? []
+    // 초기 상태(undefined)면 모든 제품이 선택된 것으로 처리
+    const currentLinked = slot.linkedProductIds ?? products?.map((p) => p.id) ?? []
     let newLinked: string[]
 
     if (checked) {
@@ -224,6 +232,8 @@ function FactorySlotInput({
         <div className="space-y-1.5 pl-1">
           {factoryCostItems.map((item) => {
             const isChecked = slot.selectedItemIds.includes(item._id)
+            // 과금 방식: 오버라이드 값 또는 DB 기본값
+            const currentChargeType = slot.chargeTypeValues?.[item._id] ?? item.chargeType ?? "once"
             return (
               <div key={item._id} className="flex items-center gap-1">
                 <Checkbox
@@ -234,7 +244,7 @@ function FactorySlotInput({
                 />
                 <Label
                   htmlFor={`${slotIndex}-${item._id}`}
-                  className="text-xs text-gray-600 w-20 truncate cursor-pointer"
+                  className="text-xs text-gray-600 w-16 truncate cursor-pointer"
                   title={item.name}
                 >
                   {item.name}
@@ -248,7 +258,22 @@ function FactorySlotInput({
                   disabled={!isChecked}
                   className={`flex-1 h-7 text-sm text-right ${!isChecked ? "bg-gray-50 text-gray-400" : ""}`}
                 />
-                <span className="text-xs text-gray-400 w-8">{factoryCurrency}</span>
+                <span className="text-xs text-gray-400 w-7">{factoryCurrency}</span>
+                {/* 과금 방식 토글 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => onChargeTypeToggle?.(item._id)}
+                  disabled={!isChecked}
+                  className={`text-xs px-1.5 py-0.5 rounded transition-colors whitespace-nowrap ${
+                    !isChecked ? "opacity-50 cursor-not-allowed" : ""
+                  } ${
+                    currentChargeType === "per_quantity"
+                      ? "bg-green-100 text-green-600 hover:bg-green-200"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  {currentChargeType === "per_quantity" ? "수량별" : "1회성"}
+                </button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -301,6 +326,7 @@ export function AdditionalCostInput({
       factoryId: factoryId as Id<"factories"> | null,
       selectedItemIds: [],
       costValues: {},
+      chargeTypeValues: {},
     }
 
     // 비용 항목 기본값 적용 (모두 선택)
@@ -376,12 +402,35 @@ export function AdditionalCostInput({
     setSlots(newSlots)
   }, [slots, setSlots])
 
+  // 과금 방식 토글 (1회성 ↔ 수량별)
+  const handleChargeTypeToggle = useCallback((slotIndex: number, itemId: string) => {
+    const newSlots = [...slots]
+    const slot = { ...newSlots[slotIndex] }
+
+    // DB 기본값 가져오기
+    const costItem = factoryCostItemsMap.get(slot.factoryId as string)?.find(item => item._id === itemId)
+    const dbChargeType = costItem?.chargeType ?? "once"
+
+    // 현재 값 (오버라이드 or DB 기본값)
+    const currentChargeType = slot.chargeTypeValues?.[itemId] ?? dbChargeType
+    const newChargeType = currentChargeType === "once" ? "per_quantity" : "once"
+
+    slot.chargeTypeValues = {
+      ...slot.chargeTypeValues,
+      [itemId]: newChargeType
+    }
+
+    newSlots[slotIndex] = slot
+    setSlots(newSlots)
+  }, [slots, setSlots, factoryCostItemsMap])
+
   // 슬롯 추가 (2개씩)
   const handleExpandSlots = useCallback(() => {
     const emptySlot: FactorySlot = {
       factoryId: null,
       selectedItemIds: [],
       costValues: {},
+      chargeTypeValues: {},
     }
     const newSlots = [...slots, emptySlot, emptySlot]
     setSlots(newSlots)
@@ -493,6 +542,7 @@ export function AdditionalCostInput({
               canRemove={slots.length > 2}
               products={products}
               onLinkedProductsChange={(productIds) => handleLinkedProductsChange(index, productIds)}
+              onChargeTypeToggle={(itemId) => handleChargeTypeToggle(index, itemId)}
             />
           )
         })}
@@ -520,5 +570,6 @@ export function createEmptySlots(count: number = 2): FactorySlot[] {
     factoryId: null,
     selectedItemIds: [],
     costValues: {},
+    chargeTypeValues: {},
   }))
 }

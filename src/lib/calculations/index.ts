@@ -155,8 +155,8 @@ export function calculateImportCost(
     ftaTariffRate
   )
 
-  // 5. 부가세 계산
-  const { vatBase, vatAmount } = calculateVat(taxableBase, tariffAmount)
+  // 5. 부가세 계산 (제품가격 + 부대비용 + 내륙운송료) × 10% (관세 제외!)
+  const { vatBase, vatAmount } = calculateVat(taxableBase, inlandShippingKRW)
 
   // 6. 국제 운송료
   const shippingResult = findShippingRate(shippingRates, totalCbm)

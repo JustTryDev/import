@@ -1,16 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { formatNumberWithCommas } from "@/lib/format"
 import {
   ChevronDown,
   ChevronUp,
   Package,
-  Truck,
-  Building2,
   Receipt,
-  CreditCard,
-  Warehouse,
+  Divide,
 } from "lucide-react"
 import type {
   Product,
@@ -22,8 +19,6 @@ import type {
   DomesticShippingConfig,
   ThreePLCostConfig,
 } from "@/lib/calculations"
-import { useQuery } from "convex/react"
-import { api } from "../../../../convex/_generated/api"
 
 interface MultiProductCostBreakdownProps {
   result: MultiProductCalculationResult | null
@@ -36,6 +31,7 @@ interface MultiProductCostBreakdownProps {
     domestic?: DomesticShippingConfig
     threePL?: ThreePLCostConfig
   }
+  orderCount?: number  // 주문 건수 (공통 비용 분배 표시용)
 }
 
 /**
@@ -53,15 +49,10 @@ export function MultiProductCostBreakdown({
   cnyRate,
   factorySlots,
   costSettings,
+  orderCount = 1,
 }: MultiProductCostBreakdownProps) {
   // 제품별 상세 펼침/접힘 상태
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
-
-  // 공장 정보 조회 (공장 비용 상세 표시용)
-  const factories = useQuery(api.factories.list)
-
-  // 공장 비용 항목 조회 (모든 항목)
-  const factoryCostItems = useQuery(api.factoryCostItems.listAll)
 
   // 원화 → 외화 역산 함수
   const toForeignCurrency = (krw: number, currency: "USD" | "CNY") => {
@@ -100,6 +91,12 @@ export function MultiProductCostBreakdown({
       return next
     })
   }
+
+  // 송금 수수료 기준 금액 (제품가격 + 공장비용 + 내륙운송료)
+  const remittanceFeeBaseForDetail = result.breakdown.productCost + result.breakdown.factoryCosts + result.sharedCostsTotal.inlandShipping
+  // 100만원 이상이면 T/T 송금, 미만이면 카드 결제
+  const isWireTransferForDetail = remittanceFeeBaseForDetail >= 1_000_000
+  const paymentMethodForDetail = isWireTransferForDetail ? "T/T 송금" : "카드 결제"
 
   // 비용 설정 설명 텍스트 생성
   const getInlandDescription = () => {
@@ -142,11 +139,6 @@ export function MultiProductCostBreakdown({
           {result.products.map((productResult, productIndex) => {
             const product = products.find((p) => p.id === productResult.productId)
             const isExpanded = expandedProducts.has(productResult.productId)
-
-            // 이 제품에 연결된 공장 슬롯 찾기
-            const linkedFactorySlots = factorySlots?.filter(
-              (slot) => slot.linkedProductIds?.includes(productResult.productId)
-            ) ?? []
 
             // 제품 가격 외화 표시
             const productForeignPrice = product
@@ -216,54 +208,53 @@ export function MultiProductCostBreakdown({
                       {productResult.factoryCostsTotal > 0 && (
                         <>
                           <CostRowWithForeign
-                            label="공장비용"
+                            label="추가 비용"
                             value={productResult.factoryCostsTotal}
                             foreignValue={formatForeign(factoryCostUSD, "USD")}
-                            subLabel="부대비용 분배"
                           />
-                          {/* 공장별 상세 품목 */}
-                          {linkedFactorySlots.map((slot) => {
-                            const factory = factories?.find((f) => f._id === slot.factoryId)
-                            const factoryName = factory?.name ?? "공장"
-
-                            return slot.selectedItemIds.map((itemId) => {
-                              const item = factoryCostItems?.find((i) => i._id === itemId)
-                              const itemName = item?.name ?? "항목"
-                              const costValue = slot.costValues[itemId] ?? 0
-                              const costKRW = Math.round(costValue * (usdRate ?? 1))
-                              const linkedCount = slot.linkedProductIds?.length ?? 1
-                              const distributedKRW = Math.round(costKRW / linkedCount)
-                              const distributedUSD = costValue / linkedCount
-
-                              return (
-                                <div
-                                  key={`${slot.factoryId}-${itemId}`}
-                                  className="flex items-center justify-between py-0.5 ml-3"
-                                >
-                                  <span className="text-xs text-gray-500">
-                                    {factoryName} - {itemName}
+                          {/* 공장별 상세 품목 (계산 결과에서 직접 가져옴) */}
+                          {productResult.factoryCostsDetail?.map((detail, idx) => {
+                            const currencySymbol = detail.currency === "USD" ? "$" : "¥"
+                            return (
+                              <div
+                                key={`factory-detail-${idx}`}
+                                className="flex items-center justify-between py-0.5 ml-3"
+                              >
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  {detail.factoryName} - {detail.itemName}
+                                  <span className={`px-1 py-0.5 rounded text-[10px] ${
+                                    detail.chargeType === "per_quantity"
+                                      ? "bg-green-100 text-green-600"
+                                      : "bg-gray-100 text-gray-400"
+                                  }`}>
+                                    {detail.chargeType === "per_quantity" ? "수량별" : "1회성"}
                                   </span>
-                                  <span className="text-xs text-gray-600">
-                                    {formatNumberWithCommas(distributedKRW)}원
-                                    <span className="text-gray-400 ml-1">
-                                      (${distributedUSD.toFixed(2)})
-                                    </span>
+                                </span>
+                                <span className="text-xs text-gray-600">
+                                  {formatNumberWithCommas(Math.round(detail.amountKRW * 10) / 10)}원
+                                  <span className="text-gray-400 ml-1">
+                                    ({currencySymbol}{detail.amountForeign.toFixed(2)})
                                   </span>
-                                </div>
-                              )
-                            })
+                                </span>
+                              </div>
+                            )
                           })}
                         </>
                       )}
 
                       {/* 3. 내륙운송료 */}
                       <CostRowWithForeign
-                        label="내륙운송료"
+                        label="중국 내륙 운송료"
                         value={productResult.sharedCosts.inlandShipping}
                         foreignValue={formatForeign(toForeignCurrency(productResult.sharedCosts.inlandShipping, "USD"), "USD")}
                         subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
+                    </div>
 
+                    {/* ===== 가로선: 내륙운송료 아래 ===== */}
+                    <div className="border-t border-gray-200 my-1" />
+
+                    <div className="space-y-1 py-2">
                       {/* 4. 관세 (FTA 절감액 표시) */}
                       {(() => {
                         const useFta = product?.useFta ?? false
@@ -306,7 +297,7 @@ export function MultiProductCostBreakdown({
 
                       {/* 5. 관세 부가세 */}
                       <CostRow
-                        label="관세 부가세"
+                        label="국외 부가세"
                         value={productResult.vatAmount}
                         subLabel="10%"
                       />
@@ -317,75 +308,67 @@ export function MultiProductCostBreakdown({
 
                     {/* ===== 섹션 2: 송금수수료 + 국제운송료 + D/O + C/O ===== */}
                     <div className="space-y-1 py-2">
-                      {/* 6. 송금 & 결제 수수료 (CBM 비율로 분배) */}
+                      {/* 6. 송금 & 결제 수수료 (제품 수로 균등 분배) */}
                       {(() => {
                         const totalRemittance = result.sharedCostsTotal.remittanceFee
-                        const distributedRemittance = Math.round(totalRemittance * productResult.cbmRatio)
+                        const distributedRemittance = Math.round(totalRemittance / products.length)
                         return (
                           <CostRow
                             label="송금 & 결제 수수료"
                             value={distributedRemittance}
-                            subLabel={`주문 ${products.length}건 분배`}
+                            badge={paymentMethodForDetail}
+                            badgeVariant={isWireTransferForDetail ? "dark" : "light"}
+                            subLabel={<><Divide className="h-3 w-3" /> {products.length}</>}
                           />
                         )
                       })()}
 
                       {/* 7. 국제운송료 */}
                       <CostRowWithForeign
-                        label="국제운송료"
+                        label="국제 운송료"
                         value={productResult.sharedCosts.internationalShipping}
                         foreignValue={formatForeign(toForeignCurrency(productResult.sharedCosts.internationalShipping, "USD"), "USD")}
-                        subLabel="CBM 비율 분배"
+                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
 
-                      {/* 8-9. D/O, C/O 비용 (companyCostsDetail에서 찾기) */}
-                      {result.companyCostsDetail?.filter(item =>
-                        item.name.includes("D/O") || item.name.includes("C/O")
-                      ).map((item) => {
-                        const distributedAmount = Math.round(item.dividedAmount * productResult.cbmRatio)
-                        return (
-                          <CostRow
-                            key={item.itemId}
-                            label={item.name}
-                            value={distributedAmount}
-                            subLabel="CBM 비율 분배"
-                          />
-                        )
-                      })}
+                      {/* 8-10. 공통 비용 (통관 수수료 제외) - orderCount로 나눈 값을 그대로 표시 */}
+                      {result.companyCostsDetail?.filter(item => !item.name.includes('통관')).map((item) => (
+                        <CostRow
+                          key={item.itemId}
+                          label={item.name}
+                          value={item.dividedAmount}
+                          subLabel={<><Divide className="h-3 w-3" /> {orderCount}</>}
+                        />
+                      ))}
                     </div>
 
                     {/* ===== 가로선 2 ===== */}
                     <div className="border-t border-gray-200 my-1" />
 
-                    {/* ===== 섹션 3: 통관수수료 + 국내운송료 + 3PL ===== */}
+                    {/* ===== 섹션 3: 통관 수수료 + 국내운송료 + 3PL ===== */}
                     <div className="space-y-1 py-2">
-                      {/* 10. 통관 수수료 (companyCostsDetail에서 찾기) */}
-                      {result.companyCostsDetail?.filter(item =>
-                        item.name.includes("통관")
-                      ).map((item) => {
-                        const distributedAmount = Math.round(item.dividedAmount * productResult.cbmRatio)
-                        return (
-                          <CostRow
-                            key={item.itemId}
-                            label={item.name}
-                            value={distributedAmount}
-                            subLabel="CBM 비율 분배"
-                          />
-                        )
-                      })}
+                      {/* 통관 수수료 (공통 비용에서 분리) */}
+                      {result.companyCostsDetail?.filter(item => item.name.includes('통관')).map((item) => (
+                        <CostRow
+                          key={item.itemId}
+                          label={item.name}
+                          value={item.dividedAmount}
+                          subLabel={<><Divide className="h-3 w-3" /> {orderCount}</>}
+                        />
+                      ))}
 
                       {/* 11. 국내운송료 */}
                       <CostRow
-                        label="국내운송료"
+                        label="국내 운송료"
                         value={productResult.sharedCosts.domesticShipping}
-                        subLabel="CBM 비율 분배"
+                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
 
                       {/* 12. 3PL비용 + 배송비 */}
                       <CostRow
-                        label="3PL비용 + 배송비"
+                        label="3PL 비용 + 배송비"
                         value={productResult.sharedCosts.threePL}
-                        subLabel="CBM 비율 분배"
+                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
                     </div>
 
@@ -399,7 +382,6 @@ export function MultiProductCostBreakdown({
                         <CostRow
                           label="국내 부가세"
                           value={productResult.sharedCosts.domesticVat}
-                          subLabel="운송+3PL+업체 VAT"
                         />
                       )}
                     </div>
@@ -411,121 +393,13 @@ export function MultiProductCostBreakdown({
         </div>
       </div>
 
-      {/* 공통 비용 합계 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">
-              공통 비용 합계
-            </span>
-          </div>
-        </div>
-
-        <div className="p-4 space-y-2">
-          <CostRow
-            label="내륙운송료"
-            value={result.sharedCostsTotal.inlandShipping}
-            subLabel={getInlandDescription()}
-            icon={<Truck className="h-3 w-3" />}
-          />
-          <CostRow
-            label="국제운송료"
-            value={result.sharedCostsTotal.internationalShipping}
-            subLabel={`총 CBM ${result.roundedCbm.toFixed(1)}`}
-            icon={<Truck className="h-3 w-3" />}
-          />
-          <CostRow
-            label="국내운송료"
-            value={result.sharedCostsTotal.domesticShipping}
-            subLabel={getDomesticDescription()}
-            icon={<Truck className="h-3 w-3" />}
-          />
-          <CostRow
-            label="3PL비용"
-            value={result.sharedCostsTotal.threePL}
-            subLabel={getThreePLDescription()}
-            icon={<Warehouse className="h-3 w-3" />}
-          />
-          <CostRow
-            label="송금수수료"
-            value={result.sharedCostsTotal.remittanceFee}
-            subLabel="제품+부대비용 기준"
-            icon={<CreditCard className="h-3 w-3" />}
-          />
-          <CostRow
-            label="업체공통비용"
-            value={result.sharedCostsTotal.companyCosts}
-            subLabel={`${result.companyCostsDetail?.length ?? 0}개 항목`}
-            icon={<Building2 className="h-3 w-3" />}
-          />
-        </div>
-      </div>
-
-      {/* 비용 구성 요약 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">
-              비용 구성 요약
-            </span>
-          </div>
-        </div>
-
-        <div className="p-4 space-y-2">
-          <CostRow
-            label="제품가격"
-            value={result.breakdown.productCost}
-            highlight
-          />
-          <CostRow
-            label="공장비용"
-            value={result.breakdown.factoryCosts}
-          />
-          <CostRow
-            label="관세"
-            value={result.breakdown.tariff}
-          />
-          <CostRow
-            label="부가세 합계"
-            value={result.totalVat}
-            subLabel="관세+국내+업체"
-          />
-          <CostRow
-            label="운송료 합계"
-            value={
-              result.breakdown.inlandShipping +
-              result.breakdown.internationalShipping +
-              result.breakdown.domesticShipping
-            }
-            subLabel="내륙+국제+국내"
-          />
-          <CostRow
-            label="3PL비용"
-            value={result.breakdown.threePLCost}
-          />
-          <CostRow
-            label="송금수수료"
-            value={result.breakdown.remittanceFee}
-          />
-          <CostRow
-            label="업체공통비용"
-            value={result.breakdown.companyCosts}
-          />
-
-          {/* 구분선 */}
-          <div className="border-t border-gray-200 my-2" />
-
-          {/* 총 합계 */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-sm font-bold text-gray-900">총 수입원가</span>
-            <span className="text-lg font-bold text-primary">
-              {formatNumberWithCommas(result.totalCost)}원
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* 총 비용 내역 (프로그레스 스택) */}
+      <TotalCostBreakdown
+        result={result}
+        usdRate={usdRate}
+        costSettings={costSettings}
+        orderCount={orderCount}
+      />
     </div>
   )
 }
@@ -537,23 +411,36 @@ function CostRow({
   subLabel,
   icon,
   highlight = false,
+  badge,
+  badgeVariant = "light",
 }: {
   label: string
   value: number
-  subLabel?: string
+  subLabel?: React.ReactNode  // 문자열 또는 아이콘 포함 가능
   icon?: React.ReactNode
   highlight?: boolean
+  badge?: string
+  badgeVariant?: "dark" | "light"
 }) {
   return (
     <div className="flex items-center justify-between py-1">
       <div className="flex items-center gap-2">
         {icon && <span className="text-gray-400">{icon}</span>}
-        <div>
+        <div className="flex items-center gap-1">
           <span className={`text-sm ${highlight ? "font-medium text-gray-900" : "text-gray-600"}`}>
             {label}
           </span>
+          {badge && (
+            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+              badgeVariant === "dark"
+                ? "bg-gray-900 text-white"
+                : "bg-gray-100 text-gray-700"
+            }`}>
+              {badge}
+            </span>
+          )}
           {subLabel && (
-            <span className="text-xs text-gray-400 ml-1">({subLabel})</span>
+            <span className="text-xs text-gray-400 flex items-center gap-0.5">({subLabel})</span>
           )}
         </div>
       </div>
@@ -594,6 +481,294 @@ function CostRowWithForeign({
         </div>
       </div>
       <span className={`text-sm font-medium ${highlight ? "text-gray-900" : "text-gray-700"}`}>
+        {formatNumberWithCommas(value)}원
+        {foreignValue && (
+          <span className="text-xs text-gray-400 ml-1">({foreignValue})</span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * 총 비용 내역 컴포넌트 (프로그레스 스택 UI)
+ *
+ * 📌 비유: 비용 비율 시각화 영수증
+ * - 각 섹션별 비용과 비율을 프로그레스 바로 표시
+ * - 5개 섹션: 제품 원가, 세금, 국제 물류, 국내 통관 및 물류, 부가세
+ */
+function TotalCostBreakdown({
+  result,
+  usdRate,
+  costSettings,
+  orderCount = 1,
+}: {
+  result: MultiProductCalculationResult
+  usdRate: number | null
+  costSettings?: {
+    inland?: InlandShippingConfig
+    domestic?: DomesticShippingConfig
+    threePL?: ThreePLCostConfig
+  }
+  orderCount?: number
+}) {
+  // 원화 → USD 역산
+  const toUSD = (krw: number) => {
+    if (!usdRate || usdRate === 0) return null
+    return krw / usdRate
+  }
+
+  // USD 포맷팅
+  const formatUSD = (amount: number | null) => {
+    if (amount === null) return ""
+    return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  // ===== 섹션별 비용 계산 =====
+
+  // 1. 제품 원가 섹션
+  const productCostTotal = result.breakdown.productCost
+  const additionalCostTotal = result.breakdown.factoryCosts
+  const inlandShippingTotal = result.sharedCostsTotal.inlandShipping
+  const productSectionTotal = productCostTotal + additionalCostTotal + inlandShippingTotal
+
+  // 2. 세금 섹션 (관세 + 국외 부가세)
+  const tariffTotal = result.breakdown.tariff
+  // 국외 부가세 = 각 제품의 vatAmount 합계 (관세 관련 부가세)
+  const foreignVatTotal = result.products.reduce((sum, p) => sum + p.vatAmount, 0)
+  const taxSectionTotal = tariffTotal + foreignVatTotal
+
+  // 3. 국제 물류 섹션
+  const remittanceFee = result.sharedCostsTotal.remittanceFee
+  const internationalShipping = result.sharedCostsTotal.internationalShipping
+  // 통관 수수료를 제외한 업체 공통 비용 (D/O, C/O 등)
+  const companyCostsWithoutCustoms = result.companyCostsDetail?.filter(
+    item => !item.name.includes('통관')
+  ) || []
+  const companyCostsWithoutCustomsTotal = companyCostsWithoutCustoms.reduce(
+    (sum, item) => sum + item.dividedAmount, 0
+  )
+  const internationalSectionTotal = remittanceFee + internationalShipping + companyCostsWithoutCustomsTotal
+
+  // 4. 국내 통관 및 물류 섹션
+  // 통관 수수료
+  const customsClearanceItem = result.companyCostsDetail?.find(item => item.name.includes('통관'))
+  const customsClearanceFee = customsClearanceItem?.dividedAmount || 0
+  const domesticShipping = result.sharedCostsTotal.domesticShipping
+  const threePL = result.sharedCostsTotal.threePL
+  const domesticSectionTotal = customsClearanceFee + domesticShipping + threePL
+
+  // 5. 부가세 섹션 (국내 부가세)
+  // 국내 부가세 = 각 제품의 domesticVat 합계
+  const domesticVatTotal = result.products.reduce((sum, p) => sum + p.sharedCosts.domesticVat, 0)
+  const vatSectionTotal = domesticVatTotal
+
+  // 총 비용
+  const totalCost = result.totalCost
+
+  // 송금 수수료 기준 금액 (제품가격 + 공장비용 + 내륙운송료)
+  const remittanceFeeBase = productCostTotal + additionalCostTotal + inlandShippingTotal
+  // 100만원 이상이면 T/T 송금, 미만이면 카드 결제
+  const isWireTransfer = remittanceFeeBase >= 1_000_000
+  const paymentMethod = isWireTransfer ? "T/T 송금" : "카드 결제"
+
+  // 비율 계산 함수
+  const getPercentage = (sectionTotal: number) => {
+    if (totalCost === 0) return 0
+    return (sectionTotal / totalCost) * 100
+  }
+
+  // 비용 설정 설명 텍스트
+  const inlandRatePerCbm = costSettings?.inland?.ratePerCbm ?? 35
+  const domesticBaseCbm = costSettings?.domestic?.baseCbm ?? 2
+  const domesticExtraUnit = costSettings?.domestic?.extraUnit ?? 0.5
+  const domesticExtraRate = costSettings?.domestic?.extraRate ?? 8750
+  const threePLUnit = costSettings?.threePL?.unit ?? 1
+  const threePLRate = costSettings?.threePL?.ratePerUnit ?? 50000
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* 헤더 */}
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Receipt className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">총 비용 내역</span>
+        </div>
+        <span className="text-lg font-bold text-primary">
+          {formatNumberWithCommas(totalCost)}원
+        </span>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* ===== 섹션 1: 제품 원가 ===== */}
+        <CostSection
+          title="제품 원가"
+          sectionTotal={productSectionTotal}
+          percentage={getPercentage(productSectionTotal)}
+        >
+          <SectionCostRow label="총 제품 가격" value={productCostTotal} />
+          <SectionCostRow label="총 추가 비용" value={additionalCostTotal} />
+          <SectionCostRow
+            label={`내륙 운송료 ($${inlandRatePerCbm} / CBM)`}
+            value={inlandShippingTotal}
+            foreignValue={formatUSD(toUSD(inlandShippingTotal))}
+          />
+        </CostSection>
+
+        {/* ===== 섹션 2: 제품 세금 ===== */}
+        <CostSection
+          title="제품 세금"
+          sectionTotal={taxSectionTotal}
+          percentage={getPercentage(taxSectionTotal)}
+        >
+          <SectionCostRow label="관세" value={tariffTotal} />
+          <SectionCostRow label="국외 부가세 (10%)" value={foreignVatTotal} />
+        </CostSection>
+
+        {/* ===== 섹션 3: 국제 물류 ===== */}
+        <CostSection
+          title="국제 물류"
+          sectionTotal={internationalSectionTotal}
+          percentage={getPercentage(internationalSectionTotal)}
+        >
+          <SectionCostRow
+            label="송금 & 결제 수수료"
+            value={remittanceFee}
+            badge={paymentMethod}
+            badgeVariant={isWireTransfer ? "dark" : "light"}
+          />
+          <SectionCostRow
+            label={`국제 운송료 (${result.totalCbm.toFixed(2)}CBM → ${result.roundedCbm.toFixed(1)}CBM 적용)`}
+            value={internationalShipping}
+            foreignValue={formatUSD(toUSD(internationalShipping))}
+          />
+          {companyCostsWithoutCustoms.map((item) => (
+            <SectionCostRow key={item.itemId} label={item.name} value={item.dividedAmount} />
+          ))}
+        </CostSection>
+
+        {/* ===== 섹션 4: 국내 통관 및 물류 ===== */}
+        <CostSection
+          title="국내 통관 및 물류"
+          sectionTotal={domesticSectionTotal}
+          percentage={getPercentage(domesticSectionTotal)}
+        >
+          <SectionCostRow label="통관 수수료" value={customsClearanceFee} />
+          <SectionCostRow
+            label={`국내 운송료 (기본 ${domesticBaseCbm}CBM, +${domesticExtraUnit}CBM ₩${formatNumberWithCommas(domesticExtraRate)})`}
+            value={domesticShipping}
+          />
+          <SectionCostRow
+            label={`3PL + 배송비 (기본 ${threePLUnit}CBM, +${threePLUnit}CBM ₩${formatNumberWithCommas(threePLRate)})`}
+            value={threePL}
+          />
+        </CostSection>
+
+        {/* ===== 섹션 5: 부가세 ===== */}
+        <CostSection
+          title="부가세"
+          sectionTotal={vatSectionTotal}
+          percentage={getPercentage(vatSectionTotal)}
+        >
+          <SectionCostRow label="국내 부가세 (10%)" value={vatSectionTotal} />
+        </CostSection>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 비용 섹션 컴포넌트 (프로그레스 바 포함)
+ */
+function CostSection({
+  title,
+  sectionTotal,
+  percentage,
+  children,
+}: {
+  title: string
+  sectionTotal: number
+  percentage: number
+  children: React.ReactNode
+}) {
+  // 애니메이션을 위한 상태 (0에서 시작)
+  const [animatedPercentage, setAnimatedPercentage] = useState(0)
+
+  // 마운트 시 애니메이션 트리거
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedPercentage(percentage)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [percentage])
+
+  return (
+    <div className="space-y-2">
+      {/* 섹션 제목 (버튼 스타일) + 비율 */}
+      <div className="flex items-center justify-between">
+        <span className="px-2.5 py-1 bg-gray-900 text-white text-xs font-medium rounded">
+          {title}
+        </span>
+        <span className="text-sm font-medium text-primary">
+          {percentage.toFixed(1)}%
+        </span>
+      </div>
+
+      {/* 프로그레스 바 (애니메이션 적용) */}
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full transition-all duration-[1400ms] ease-out"
+          style={{ width: `${Math.min(animatedPercentage, 100)}%` }}
+        />
+      </div>
+
+      {/* 항목 리스트 */}
+      <div className="pl-2 space-y-1">
+        {children}
+      </div>
+
+      {/* 소계 */}
+      <div className="flex items-center justify-end pt-1 border-t border-gray-100">
+        <span className="text-xs text-gray-500 mr-2">소계</span>
+        <span className="text-sm font-medium text-gray-700">
+          {formatNumberWithCommas(sectionTotal)}원
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 섹션 내 비용 행 컴포넌트
+ */
+function SectionCostRow({
+  label,
+  value,
+  foreignValue,
+  badge,
+  badgeVariant = "light",
+}: {
+  label: string
+  value: number
+  foreignValue?: string
+  badge?: string
+  badgeVariant?: "dark" | "light"
+}) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-gray-600">{label}</span>
+        {badge && (
+          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+            badgeVariant === "dark"
+              ? "bg-gray-900 text-white"
+              : "bg-gray-100 text-gray-700"
+          }`}>
+            {badge}
+          </span>
+        )}
+      </div>
+      <span className="text-sm text-gray-700">
         {formatNumberWithCommas(value)}원
         {foreignValue && (
           <span className="text-xs text-gray-400 ml-1">({foreignValue})</span>

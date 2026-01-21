@@ -17,6 +17,7 @@ export interface PresetSlot {
   factoryId: string                       // 공장 ID (문자열)
   selectedItemIds: string[]               // 선택된 비용 항목 IDs
   costValues: { [itemId: string]: number } // 항목별 금액
+  chargeTypeValues?: { [itemId: string]: "once" | "per_quantity" } // 과금 방식 오버라이드
 }
 
 // 프리셋 타입 (DB에서 조회된 데이터)

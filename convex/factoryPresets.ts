@@ -13,6 +13,7 @@ const slotSchema = v.object({
   factoryId: v.string(),                // 공장 ID (문자열로 저장)
   selectedItemIds: v.array(v.string()), // 선택된 비용 항목 IDs
   costValues: v.any(),                  // { [itemId]: number } 형태
+  chargeTypeValues: v.optional(v.any()), // { [itemId]: "once" | "per_quantity" } 형태 (과금 방식 오버라이드)
 })
 
 // 모든 프리셋 조회

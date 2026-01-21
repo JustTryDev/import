@@ -86,6 +86,7 @@ export default defineSchema({
       // 📌 다중 제품 지원용 필드 (선택적)
       quantityValues: v.optional(v.any()),  // { [itemId]: number } 형태 (항목별 수량, 수량연동용)
       linkedProductIds: v.optional(v.array(v.string())),  // 연결된 제품 ID 목록 (균등 분배용)
+      chargeTypeValues: v.optional(v.any()),  // { [itemId]: "once" | "per_quantity" } 형태 (과금 방식 오버라이드)
     })),
     isDefault: v.optional(v.boolean()),     // 기본 프리셋 여부 (페이지 로드 시 자동 적용)
     sortOrder: v.number(),                  // 정렬 순서

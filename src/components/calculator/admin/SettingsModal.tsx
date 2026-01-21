@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building2, Truck, DollarSign, Factory } from "lucide-react"
+import { Building2, Truck, DollarSign, Factory, Bookmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,9 +22,10 @@ import { ShippingCompanyManager } from "./ShippingCompanyManager"
 import { ShippingRateManager } from "./ShippingRateManager"
 import { CompanyCostManager } from "./CompanyCostManager"
 import { FactoryManager } from "./FactoryManager"
+import { PresetManager } from "./PresetManager"
 
 // 탭 타입
-type SettingsTab = "companies" | "rates" | "companyCosts" | "factories"
+type SettingsTab = "companies" | "rates" | "companyCosts" | "factories" | "presets"
 
 interface SettingsModalProps {
   open: boolean
@@ -50,7 +51,7 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[1000px] w-[90vw] max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>설정</DialogTitle>
         </DialogHeader>
@@ -84,7 +85,7 @@ export function SettingsModal({
           onValueChange={(v) => setActiveTab(v as SettingsTab)}
           className="flex-1 flex flex-col min-h-0"
         >
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="companies" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">운송 업체</span>
@@ -100,6 +101,10 @@ export function SettingsModal({
             <TabsTrigger value="factories" className="flex items-center gap-2">
               <Factory className="h-4 w-4" />
               <span className="hidden sm:inline">중국 공장</span>
+            </TabsTrigger>
+            <TabsTrigger value="presets" className="flex items-center gap-2">
+              <Bookmark className="h-4 w-4" />
+              <span className="hidden sm:inline">프리셋</span>
             </TabsTrigger>
           </TabsList>
 
@@ -123,6 +128,11 @@ export function SettingsModal({
             {/* 중국 공장 관리 */}
             <TabsContent value="factories" className="mt-0">
               <FactoryManager />
+            </TabsContent>
+
+            {/* 프리셋 관리 */}
+            <TabsContent value="presets" className="mt-0">
+              <PresetManager />
             </TabsContent>
           </div>
         </Tabs>

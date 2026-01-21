@@ -56,6 +56,7 @@ export { useCompanyCosts } from "./useCompanyCosts"
 // 중국 공장 관련
 export { useFactories } from "./useFactories"
 export { useFactoryCostItems, useAllFactoryCostItems } from "./useFactoryCostItems"
+export { useFactoryPresets } from "./useFactoryPresets"
 
 // 시드 데이터
 export { useSeedData, useAutoSeed } from "./useSeedData"

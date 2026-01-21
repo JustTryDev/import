@@ -15,20 +15,29 @@ export function DimensionsInput({
   dimensions,
   setDimensions,
 }: DimensionsInputProps) {
-  // 숫자 입력 처리
+  // 크기 최대값 (200cm)
+  const MAX_DIMENSION = 200
+
+  // 숫자 입력 처리 (최대 200cm)
   const handleChange = (
     field: keyof ProductDimensions,
     value: string
   ) => {
     const numericValue = value.replace(/[^0-9.]/g, "")
-    const num = numericValue === "" ? 0 : Number(numericValue)
+    let num = numericValue === "" ? 0 : Number(numericValue)
+    // 최대값 제한 (200cm)
+    if (num > MAX_DIMENSION) {
+      num = MAX_DIMENSION
+    }
     setDimensions({ ...dimensions, [field]: num })
   }
 
-  // 증가/감소 처리
+  // 증가/감소 처리 (최대 200cm)
   const handleIncrement = (field: keyof ProductDimensions) => {
     const currentValue = dimensions[field] || 0
-    setDimensions({ ...dimensions, [field]: currentValue + 1 })
+    if (currentValue < MAX_DIMENSION) {
+      setDimensions({ ...dimensions, [field]: currentValue + 1 })
+    }
   }
 
   const handleDecrement = (field: keyof ProductDimensions) => {

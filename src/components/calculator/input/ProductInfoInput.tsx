@@ -85,7 +85,10 @@ export function ProductInfoInput({
     return () => document.removeEventListener("click", handleClickOutside)
   }, [])
 
-  // 숫자 입력 처리 (소수점 2자리까지 허용)
+  // 단가 최대값 (100만 달러)
+  const MAX_UNIT_PRICE = 1000000
+
+  // 숫자 입력 처리 (소수점 2자리까지 허용, 최대 100만)
   const handlePriceChange = (value: string) => {
     // 콤마 제거 후 숫자와 소수점만 허용
     const cleaned = value.replace(/,/g, "").replace(/[^0-9.]/g, "")
@@ -96,6 +99,12 @@ export function ProductInfoInput({
     if (parts.length > 1) {
       // 소수점 이하 2자리까지만 허용
       result = parts[0] + "." + parts[1].slice(0, 2)
+    }
+
+    // 최대값 제한 (100만)
+    const numValue = parseFloat(result)
+    if (!isNaN(numValue) && numValue > MAX_UNIT_PRICE) {
+      result = String(MAX_UNIT_PRICE)
     }
 
     setUnitPrice(result)
@@ -113,11 +122,20 @@ export function ProductInfoInput({
 
   const formattedUnitPrice = formatPriceDisplay(unitPrice)
 
+  // 수량 최대값 (100만 개)
+  const MAX_QUANTITY = 1000000
+
   const handleQuantityChange = (value: string) => {
     // 콤마 제거 후 숫자만 추출
     const numericValue = value.replace(/[^0-9]/g, "")
     if (numericValue === "" || !isNaN(Number(numericValue))) {
-      setQuantity(numericValue)
+      // 최대값 제한 (100만)
+      const num = Number(numericValue)
+      if (num > MAX_QUANTITY) {
+        setQuantity(String(MAX_QUANTITY))
+      } else {
+        setQuantity(numericValue)
+      }
     }
   }
 

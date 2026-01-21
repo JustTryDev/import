@@ -182,11 +182,11 @@ export function calculateImportCost(
     totalVat: vatAmount + domesticShippingVat + threePLVat + companyCostsVat,  // 총 부가세
   }
 
-  // 10. 총 수입원가 계산
+  // 10. 총 수입원가 계산 (반올림)
   // = 제품가격 + 부대비용 + 내륙운송료 + 관세 + 관세부가세
   // + 국제운송료 + 국내운송료 + 국내운송료부가세 + 3PL비용 + 3PL부가세
   // + 송금수수료 + 업체공통비용 + 업체비용부가세
-  const totalCost =
+  const totalCost = Math.round(
     totalPriceKRW +
     totalAdditionalCosts +
     inlandShippingKRW +
@@ -200,8 +200,9 @@ export function calculateImportCost(
     remittanceFee +
     totalCompanyCosts +
     companyCostsVat                // 업체 비용 부가세
+  )
 
-  // 개당 수입원가
+  // 개당 수입원가 (반올림)
   const unitCost = Math.round(totalCost / quantity)
 
   return {

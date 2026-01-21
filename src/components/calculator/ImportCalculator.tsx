@@ -13,6 +13,7 @@ import {
   useFactories,
   useAllFactoryCostItems,
   useAutoSeed,
+  useFactoryPresets,
 } from "@/hooks"
 import {
   calculateImportCost,
@@ -43,6 +44,10 @@ import {
 
 // 설정 모달
 import { SettingsModal } from "./admin/SettingsModal"
+
+// 프리셋 다이얼로그
+import { PresetSaveDialog } from "./input/PresetSaveDialog"
+import type { FactoryPreset, PresetSlot } from "@/hooks/useFactoryPresets"
 
 // 계산기 메인 컴포넌트
 export function ImportCalculator() {
@@ -85,6 +90,11 @@ export function ImportCalculator() {
 
   // 부대 비용 슬롯 (기본 2개)
   const [factorySlots, setFactorySlots] = useState<FactorySlot[]>(() => createEmptySlots(2))
+
+  // ===== 프리셋 (즐겨찾기) =====
+  const { presets, createPreset } = useFactoryPresets()
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false)
+  const [selectedPresetId, setSelectedPresetId] = useState<Id<"factoryPresets"> | null>(null)
 
   // ===== 업체별 공통 비용 =====
   const { items: companyCostItems, isLoading: companyCostsLoading } = useCompanyCosts(selectedCompanyId)
@@ -310,6 +320,44 @@ export function ImportCalculator() {
     }
   }, [])
 
+  // ===== 프리셋 핸들러 =====
+  // 프리셋 불러오기
+  const handleLoadPreset = useCallback((preset: FactoryPreset) => {
+    // 프리셋 슬롯을 현재 슬롯 형식으로 변환
+    const newSlots: FactorySlot[] = preset.slots.map((slot) => ({
+      factoryId: slot.factoryId as Id<"factories"> | null,
+      selectedItemIds: slot.selectedItemIds,
+      costValues: slot.costValues as { [itemId: string]: number },
+    }))
+
+    // 최소 2개 슬롯 보장
+    while (newSlots.length < 2) {
+      newSlots.push({
+        factoryId: null,
+        selectedItemIds: [],
+        costValues: {},
+      })
+    }
+
+    setFactorySlots(newSlots)
+    setSelectedPresetId(preset._id)  // 선택된 프리셋 ID 저장
+  }, [])
+
+  // 프리셋 저장 (신규 생성)
+  const handleSavePreset = useCallback(async (name: string) => {
+    // 현재 슬롯을 프리셋 형식으로 변환
+    const slotsToSave: PresetSlot[] = factorySlots
+      .filter((slot) => slot.factoryId !== null)  // 공장 선택된 슬롯만
+      .map((slot) => ({
+        factoryId: slot.factoryId as string,
+        selectedItemIds: slot.selectedItemIds,
+        costValues: slot.costValues,
+      }))
+
+    const newPresetId = await createPreset({ name, slots: slotsToSave })
+    setSelectedPresetId(newPresetId)  // 새로 저장된 프리셋 선택
+  }, [factorySlots, createPreset])
+
   return (
     <div className="h-screen bg-gray-50">
       {/* 메인 컨텐츠 - 좌우 2단 레이아웃 (50:50) */}
@@ -366,6 +414,10 @@ export function ImportCalculator() {
                 isLoading={factoriesLoading || factoryCostItemsLoading}
                 usdRate={usdRate}
                 cnyRate={cnyRate}
+                presets={presets}
+                selectedPresetId={selectedPresetId}
+                onLoadPreset={handleLoadPreset}
+                onSavePreset={() => setPresetDialogOpen(true)}
               />
             </div>
 
@@ -435,6 +487,16 @@ export function ImportCalculator() {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         defaultTab={settingsTab}
+      />
+
+      {/* 프리셋 저장 다이얼로그 */}
+      <PresetSaveDialog
+        open={presetDialogOpen}
+        onOpenChange={setPresetDialogOpen}
+        slots={factorySlots}
+        factories={factories}
+        factoryCostItemsMap={factoryCostItemsMap}
+        onSave={handleSavePreset}
       />
     </div>
   )

@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Settings, Plus, X, Trash2 } from "lucide-react"
+import { Settings, Plus, X, Trash2, Save, Bookmark } from "lucide-react"
 import { Id } from "../../../../convex/_generated/dataModel"
+import type { FactoryPreset } from "@/hooks/useFactoryPresets"
 
 // 공장 비용 항목 타입
 export interface FactoryCostItem {
@@ -47,6 +48,11 @@ interface AdditionalCostInputProps {
   // 환율 정보 (계산용)
   usdRate: number | null
   cnyRate: number | null
+  // 프리셋 관련
+  presets?: FactoryPreset[]
+  selectedPresetId?: Id<"factoryPresets"> | null  // 현재 선택된 프리셋
+  onLoadPreset?: (preset: FactoryPreset) => void
+  onSavePreset?: () => void
 }
 
 // 단일 공장 슬롯 컴포넌트
@@ -189,6 +195,10 @@ export function AdditionalCostInput({
   isLoading,
   usdRate,
   cnyRate,
+  presets,
+  selectedPresetId,
+  onLoadPreset,
+  onSavePreset,
 }: AdditionalCostInputProps) {
   // 확장 상태 (기본 3개, 확장 시 6개)
   const visibleSlotCount = slots.length
@@ -309,17 +319,57 @@ export function AdditionalCostInput({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700">중국 공장 추가 비용</h3>
-        {onSettingsClick && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onSettingsClick}
-            className="h-7 px-2 text-gray-500 hover:text-gray-700"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {/* 프리셋 저장 버튼 */}
+          {onSavePreset && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSavePreset}
+              className="h-7 px-2 text-gray-500 hover:text-gray-700"
+              title="현재 설정 저장"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          )}
+          {/* 설정 버튼 */}
+          {onSettingsClick && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSettingsClick}
+              className="h-7 px-2 text-gray-500 hover:text-gray-700"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* 프리셋 버튼 목록 */}
+      {presets && presets.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((preset) => {
+            const isSelected = selectedPresetId === preset._id
+            return (
+              <Button
+                key={preset._id}
+                variant={isSelected ? "default" : "outline"}
+                size="sm"
+                onClick={() => onLoadPreset?.(preset)}
+                className={`h-7 px-2.5 text-xs ${
+                  isSelected
+                    ? "bg-primary text-white"
+                    : "bg-white hover:bg-primary/5 hover:border-primary/30"
+                }`}
+              >
+                <Bookmark className={`h-3 w-3 mr-1 ${isSelected ? "text-white" : "text-primary/60"}`} />
+                {preset.name}
+              </Button>
+            )
+          })}
+        </div>
+      )}
 
       {/* 공장 슬롯들 (2열 그리드) */}
       <div className="grid grid-cols-2 gap-2">

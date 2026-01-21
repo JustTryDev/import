@@ -68,4 +68,19 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_factory", ["factoryId"]),
+
+  // 공장 비용 프리셋 (즐겨찾기)
+  // 📌 비유: 카페에서 "자주 주문하는 메뉴" 저장해두는 것처럼
+  // 공장 + 비용 조합을 저장해두고 한 번에 불러오기
+  factoryPresets: defineTable({
+    name: v.string(),                       // 프리셋 이름 (예: "봉제인형 기본")
+    slots: v.array(v.object({               // 슬롯 데이터 배열
+      factoryId: v.string(),                // 공장 ID (문자열로 저장)
+      selectedItemIds: v.array(v.string()), // 선택된 비용 항목 IDs
+      costValues: v.any(),                  // { [itemId]: number } 형태 (항목별 금액)
+    })),
+    sortOrder: v.number(),                  // 정렬 순서
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
 })

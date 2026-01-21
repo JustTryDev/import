@@ -1,19 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { RefreshCw, TrendingUp, ChevronDown, ChevronUp, Check } from "lucide-react"
+import { RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Check, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { DailyRate } from "@/types/exchange"
 
 interface ExchangeRateDisplayProps {
   usdRate: number | null
   cnyRate: number | null
-  selectedCurrency: "USD" | "CNY"
+  selectedCurrency?: "USD" | "CNY"  // 선택적 (호환성 유지)
   updatedAt: string | null
   history: DailyRate[]
   onRefresh?: () => void
   isLoading?: boolean
-  onCurrencyChange?: (currency: "USD" | "CNY") => void  // 통화 선택 콜백
+  onCurrencyChange?: (currency: "USD" | "CNY") => void  // 선택적 (호환성 유지)
 }
 
 // 환율 표시 컴포넌트
@@ -62,52 +62,137 @@ export function ExchangeRateDisplay({
         <div className="text-sm text-gray-400">환율 정보 로딩 중...</div>
       ) : (
         <>
-          {/* 오늘의 환율 카드 (클릭하여 통화 선택) */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* USD 환율 */}
-            <button
-              type="button"
-              onClick={() => onCurrencyChange?.("USD")}
-              className={`relative rounded-lg p-3 text-left transition-all ${
-                selectedCurrency === "USD"
-                  ? "bg-primary/10 border-2 border-primary"
-                  : "bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              <div className="text-xs text-gray-500">USD (달러)</div>
-              <div className="text-lg font-bold text-gray-900">
-                {usdRate.toFixed(1)}
-                <span className="text-sm font-normal text-gray-500">원</span>
-              </div>
-              {selectedCurrency === "USD" && (
-                <div className="absolute top-2 right-2 bg-primary rounded-full p-0.5">
-                  <Check className="h-3 w-3 text-white" />
-                </div>
-              )}
-            </button>
+          {/* 전날 환율과 비교하여 등락폭 계산 */}
+          {(() => {
+            // history[0]: 오늘, history[1]: 어제
+            const yesterdayRate = history.length > 1 ? history[1] : null
 
-            {/* CNY 환율 */}
-            <button
-              type="button"
-              onClick={() => onCurrencyChange?.("CNY")}
-              className={`relative rounded-lg p-3 text-left transition-all ${
-                selectedCurrency === "CNY"
-                  ? "bg-primary/10 border-2 border-primary"
-                  : "bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              <div className="text-xs text-gray-500">CNY (위안)</div>
-              <div className="text-lg font-bold text-gray-900">
-                {cnyRate.toFixed(1)}
-                <span className="text-sm font-normal text-gray-500">원</span>
-              </div>
-              {selectedCurrency === "CNY" && (
-                <div className="absolute top-2 right-2 bg-primary rounded-full p-0.5">
-                  <Check className="h-3 w-3 text-white" />
+            // USD 등락폭 계산
+            const usdChange = yesterdayRate
+              ? ((usdRate - yesterdayRate.usdRate) / yesterdayRate.usdRate) * 100
+              : 0
+
+            // CNY 등락폭 계산
+            const cnyChange = yesterdayRate
+              ? ((cnyRate - yesterdayRate.cnyRate) / yesterdayRate.cnyRate) * 100
+              : 0
+
+            // 등락폭 표시 컴포넌트
+            const ChangeIndicator = ({ change }: { change: number }) => {
+              if (Math.abs(change) < 0.01) {
+                // 변동 없음
+                return (
+                  <span className="flex items-center gap-0.5 text-xs text-gray-400">
+                    <Minus className="h-3 w-3" />
+                    0.00%
+                  </span>
+                )
+              } else if (change > 0) {
+                // 상승 (원화 약세 = 빨간색)
+                return (
+                  <span className="flex items-center gap-0.5 text-xs text-red-500">
+                    <TrendingUp className="h-3 w-3" />
+                    +{change.toFixed(2)}%
+                  </span>
+                )
+              } else {
+                // 하락 (원화 강세 = 파란색)
+                return (
+                  <span className="flex items-center gap-0.5 text-xs text-blue-500">
+                    <TrendingDown className="h-3 w-3" />
+                    {change.toFixed(2)}%
+                  </span>
+                )
+              }
+            }
+
+            return (
+              <>
+                {/* 오늘의 환율 카드 */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* USD 환율 */}
+                  {onCurrencyChange ? (
+                    // 선택 모드 (기존 호환성)
+                    <button
+                      type="button"
+                      onClick={() => onCurrencyChange("USD")}
+                      className={`relative rounded-lg p-3 text-left transition-all ${
+                        selectedCurrency === "USD"
+                          ? "bg-primary/10 border-2 border-primary"
+                          : "bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">USD (달러)</span>
+                        {yesterdayRate && <ChangeIndicator change={usdChange} />}
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {usdRate.toFixed(1)}
+                        <span className="text-sm font-normal text-gray-500">원</span>
+                      </div>
+                      {selectedCurrency === "USD" && (
+                        <div className="absolute top-2 right-2 bg-primary rounded-full p-0.5">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ) : (
+                    // 표시 모드 (다중 제품용)
+                    <div className="rounded-lg p-3 bg-white border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">USD (달러)</span>
+                        {yesterdayRate && <ChangeIndicator change={usdChange} />}
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {usdRate.toFixed(1)}
+                        <span className="text-sm font-normal text-gray-500">원</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CNY 환율 */}
+                  {onCurrencyChange ? (
+                    // 선택 모드 (기존 호환성)
+                    <button
+                      type="button"
+                      onClick={() => onCurrencyChange("CNY")}
+                      className={`relative rounded-lg p-3 text-left transition-all ${
+                        selectedCurrency === "CNY"
+                          ? "bg-primary/10 border-2 border-primary"
+                          : "bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">CNY (위안)</span>
+                        {yesterdayRate && <ChangeIndicator change={cnyChange} />}
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {cnyRate.toFixed(1)}
+                        <span className="text-sm font-normal text-gray-500">원</span>
+                      </div>
+                      {selectedCurrency === "CNY" && (
+                        <div className="absolute top-2 right-2 bg-primary rounded-full p-0.5">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ) : (
+                    // 표시 모드 (다중 제품용)
+                    <div className="rounded-lg p-3 bg-white border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">CNY (위안)</span>
+                        {yesterdayRate && <ChangeIndicator change={cnyChange} />}
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {cnyRate.toFixed(1)}
+                        <span className="text-sm font-normal text-gray-500">원</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </button>
-          </div>
+              </>
+            )
+          })()}
 
           {/* 최근 5일 환율 (접기/펼치기) */}
           {history.length > 0 && (

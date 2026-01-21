@@ -341,6 +341,10 @@ export {
   calculate3PLVat,
 }
 
+// 다중 제품 계산 함수
+export { calculateMultiProductImportCost } from "./multiProduct"
+export type { CalculateMultiProductParams } from "./multiProduct"
+
 export type {
   ShippingRateTable,
   DomesticShippingConfig,
@@ -351,4 +355,7 @@ export type {
 export type {
   CostItemInput,
   AdditionalCostInput,
+  FactorySlotInput,
+  FactorySlotCostItem,
+  ProductFactoryCostResult,
 } from "./costs"

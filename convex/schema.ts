@@ -63,6 +63,11 @@ export default defineSchema({
     factoryId: v.id("factories"),           // 공장 ID
     name: v.string(),                       // 비용 항목명 (라벨 비용, 스티커 비용, 내륙 운송료 등)
     amount: v.number(),                     // 금액 (공장 통화 기준)
+    // 📌 부과 방식: "once" = 1회성 (금형비, 샘플비), "per_quantity" = 수량연동 (라벨, 태그)
+    chargeType: v.optional(v.union(
+      v.literal("once"),
+      v.literal("per_quantity")
+    )),                                     // 기본값: "once" (1회성)
     isActive: v.boolean(),                  // 활성화 여부
     sortOrder: v.number(),                  // 정렬 순서
     createdAt: v.number(),
@@ -78,6 +83,9 @@ export default defineSchema({
       factoryId: v.string(),                // 공장 ID (문자열로 저장)
       selectedItemIds: v.array(v.string()), // 선택된 비용 항목 IDs
       costValues: v.any(),                  // { [itemId]: number } 형태 (항목별 금액)
+      // 📌 다중 제품 지원용 필드 (선택적)
+      quantityValues: v.optional(v.any()),  // { [itemId]: number } 형태 (항목별 수량, 수량연동용)
+      linkedProductIds: v.optional(v.array(v.string())),  // 연결된 제품 ID 목록 (균등 분배용)
     })),
     isDefault: v.optional(v.boolean()),     // 기본 프리셋 여부 (페이지 로드 시 자동 적용)
     sortOrder: v.number(),                  // 정렬 순서

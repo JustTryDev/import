@@ -8,3 +8,7 @@ export { ShippingCompanySelector } from "./ShippingCompanySelector"
 export { AdditionalCostInput } from "./AdditionalCostInput"
 export { CompanyCostSelector } from "./CompanyCostSelector"
 export { TariffRateInput } from "./TariffRateInput"
+
+// 다중 제품 입력 컴포넌트
+export { ProductCard, createEmptyProduct } from "./ProductCard"
+export { ProductList } from "./ProductList"

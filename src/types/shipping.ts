@@ -1,4 +1,5 @@
 import { Id } from "../../convex/_generated/dataModel"
+import { HsCodeWithTariff } from "./tariff"
 
 // ===== 제품 정보 =====
 
@@ -7,6 +8,43 @@ export interface ProductDimensions {
   width: number   // 가로 (cm)
   height: number  // 높이 (cm)
   depth: number   // 폭 (cm)
+}
+
+// 개별 제품 (다중 제품 입력용)
+export interface Product {
+  id: string                        // 고유 ID (uuid)
+  name?: string                     // 제품명 (선택)
+  unitPrice: number                 // 개당 원가 (외화)
+  currency: "USD" | "CNY"           // 통화
+  quantity: number                  // 수량
+  dimensions: ProductDimensions     // 제품 크기 (cm)
+
+  // 관세 정보 (제품마다 다름)
+  hsCode: HsCodeWithTariff | null   // 선택된 HS Code 정보
+  basicTariffRate: number           // 기본 관세율 (%)
+  ftaTariffRate: number             // FTA 관세율 (%)
+  useFta: boolean                   // FTA 적용 여부
+}
+
+// 공장 슬롯 타입 (다중 제품 연결 지원)
+export interface FactorySlot {
+  factoryId: Id<"factories"> | null   // 선택된 공장 ID
+  selectedItemIds: string[]           // 선택된 비용 항목 ID 목록
+  costValues: { [itemId: string]: number }  // 각 항목별 금액 (조절 가능)
+  quantityValues: { [itemId: string]: number }  // 각 항목별 수량 (수량연동용)
+  linkedProductIds: string[]          // 연결된 제품 ID 목록 (균등 분배용)
+}
+
+// 공장 비용 항목 (chargeType 포함)
+export interface FactoryCostItemWithChargeType {
+  _id: Id<"factoryCostItems">
+  factoryId: Id<"factories">
+  name: string
+  amount: number
+  chargeType: "once" | "per_quantity"  // 1회성 vs 수량연동
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
 }
 
 // ===== 운송 업체 =====
@@ -210,4 +248,114 @@ export interface ComparisonResult {
   fta: CalculationResult        // FTA 세율 적용
   savings: number               // 절감액
   savingsPercent: number        // 절감율 (%)
+}
+
+// ===== 다중 제품 계산 =====
+
+// 제품별 계산 결과
+export interface ProductCalculationResult {
+  productId: string               // 제품 ID
+  productName?: string            // 제품명
+
+  // CBM 정보
+  unitCbm: number                 // 단일 제품 CBM
+  totalCbm: number                // 해당 제품 총 CBM
+  cbmRatio: number                // 전체 대비 CBM 비율 (0~1)
+
+  // 제품 비용
+  productPriceKRW: number         // 제품가격 (원화)
+
+  // 관세/부가세
+  tariffRate: number              // 적용된 관세율 (%)
+  tariffAmount: number            // 관세 금액
+  vatAmount: number               // 부가세 (관세 관련)
+
+  // 공장 비용 (균등 분배 후)
+  factoryCostsTotal: number       // 공장비용 합계
+
+  // 공통 비용 분배 (CBM 비율)
+  sharedCosts: {
+    inlandShipping: number        // 내륙운송료 (분배)
+    internationalShipping: number // 국제운송료 (분배)
+    domesticShipping: number      // 국내운송료 (분배)
+    threePL: number               // 3PL 비용 (분배)
+    domesticVat: number           // 국내 관련 부가세 (분배)
+  }
+
+  // 최종 결과
+  totalCost: number               // 해당 제품 총 비용
+  unitCost: number                // 개당 수입원가
+}
+
+// 다중 제품 계산 입력값
+export interface MultiProductCalculatorInput {
+  products: Product[]             // 제품 배열
+
+  // 운송 정보
+  shippingCompanyId: Id<"shippingCompanies">
+  rateTypeId: Id<"shippingRateTypes">
+
+  // 공장 비용 (슬롯 단위, 연결된 제품 포함)
+  factorySlots: FactorySlot[]
+
+  // 업체별 공통 비용 (선택된 항목)
+  selectedCompanyCostIds: Id<"companyCostItems">[]
+
+  // 주문 건수 (기본값: 제품 개수)
+  orderCount: number
+
+  // 환율
+  exchangeRate: {
+    usd: number                   // 1 USD = ? KRW
+    cny: number                   // 1 CNY = ? KRW
+  }
+}
+
+// 다중 제품 계산 결과
+export interface MultiProductCalculationResult {
+  // 제품별 결과
+  products: ProductCalculationResult[]
+
+  // 전체 합계
+  totalCbm: number                // 전체 CBM
+  roundedCbm: number              // 0.5 단위 올림 CBM
+  totalCost: number               // 전체 수입원가
+
+  // 공통 비용 내역 (분배 전 총액)
+  sharedCostsTotal: {
+    inlandShipping: number        // 내륙운송료
+    internationalShipping: number // 국제운송료
+    domesticShipping: number      // 국내운송료
+    threePL: number               // 3PL 비용
+    companyCosts: number          // 업체 공통 비용
+    remittanceFee: number         // 송금 수수료
+  }
+
+  // 업체 공통 비용 상세
+  companyCostsDetail: {
+    itemId: Id<"companyCostItems">
+    name: string
+    originalAmount: number
+    dividedAmount: number
+    orderCount: number
+    isVatApplicable: boolean
+    vatAmount: number
+  }[]
+
+  // 부가세 총액
+  totalVat: number
+
+  // 비용 구성 요약 (전체)
+  breakdown: {
+    productCost: number           // 제품가격 합계
+    factoryCosts: number          // 공장비용 합계
+    inlandShipping: number        // 내륙운송료
+    tariff: number                // 관세 합계
+    vat: number                   // 부가세 합계
+    internationalShipping: number // 국제운송료
+    domesticShipping: number      // 국내운송료
+    threePLCost: number           // 3PL 비용
+    remittanceFee: number         // 송금수수료
+    companyCosts: number          // 업체별 공통비용
+  }
 }

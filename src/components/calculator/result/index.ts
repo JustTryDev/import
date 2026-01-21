@@ -6,3 +6,6 @@ export { CBMDisplay } from "./CBMDisplay"
 export { CostBreakdown } from "./CostBreakdown"
 export { TotalCostCard } from "./TotalCostCard"
 export { ExchangeRateDisplay } from "./ExchangeRateDisplay"
+
+// 다중 제품용
+export { MultiProductCostBreakdown } from "./MultiProductCostBreakdown"

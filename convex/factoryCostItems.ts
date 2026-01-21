@@ -30,12 +30,18 @@ export const create = mutation({
     factoryId: v.id("factories"),
     name: v.string(),
     amount: v.number(),
+    // 📌 부과 방식: "once" = 1회성 (금형비), "per_quantity" = 수량연동 (라벨)
+    chargeType: v.optional(v.union(
+      v.literal("once"),
+      v.literal("per_quantity")
+    )),
     sortOrder: v.number(),
   },
   handler: async (ctx, args) => {
     const now = Date.now()
     return await ctx.db.insert("factoryCostItems", {
       ...args,
+      chargeType: args.chargeType ?? "once",  // 기본값: 1회성
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -49,13 +55,18 @@ export const update = mutation({
     id: v.id("factoryCostItems"),
     name: v.optional(v.string()),
     amount: v.optional(v.number()),
+    // 📌 부과 방식: "once" = 1회성 (금형비), "per_quantity" = 수량연동 (라벨)
+    chargeType: v.optional(v.union(
+      v.literal("once"),
+      v.literal("per_quantity")
+    )),
     sortOrder: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args
     const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
     )
     return await ctx.db.patch(id, {
       ...filteredUpdates,

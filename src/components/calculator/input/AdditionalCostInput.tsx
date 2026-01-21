@@ -12,9 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Settings, Plus, X, Trash2, Save, Bookmark } from "lucide-react"
+import { Settings, Plus, X, Trash2, Save, Bookmark, Link2 } from "lucide-react"
 import { Id } from "../../../../convex/_generated/dataModel"
 import type { FactoryPreset } from "@/hooks/useFactoryPresets"
+import type { Product } from "@/types/shipping"
 
 // 공장 비용 항목 타입
 export interface FactoryCostItem {
@@ -29,6 +30,9 @@ export interface FactorySlot {
   factoryId: Id<"factories"> | null
   selectedItemIds: string[] // 체크된 비용 항목 IDs
   costValues: { [itemId: string]: number } // 금액 값
+  // 다중 제품 지원용
+  quantityValues?: { [itemId: string]: number } // 수량 값 (수량연동 항목용)
+  linkedProductIds?: string[] // 연결된 제품 ID 목록 (비용 분배용)
 }
 
 // 공장 타입
@@ -53,6 +57,8 @@ interface AdditionalCostInputProps {
   selectedPresetId?: Id<"factoryPresets"> | null  // 현재 선택된 프리셋
   onLoadPreset?: (preset: FactoryPreset) => void
   onSavePreset?: () => void
+  // 다중 제품 연결용
+  products?: Product[]  // 제품 목록 (연결된 제품 체크박스용)
 }
 
 // 단일 공장 슬롯 컴포넌트
@@ -69,6 +75,9 @@ function FactorySlotInput({
   onItemDelete,
   onRemove,
   canRemove,
+  // 다중 제품 연결용
+  products,
+  onLinkedProductsChange,
 }: {
   slotIndex: number
   slot: FactorySlot
@@ -82,6 +91,9 @@ function FactorySlotInput({
   onItemDelete: (itemId: string) => void
   onRemove: () => void
   canRemove: boolean
+  // 다중 제품 연결용
+  products?: Product[]
+  onLinkedProductsChange?: (productIds: string[]) => void
 }) {
   // 금액 표시
   const getDisplayValue = (itemId: string): string => {
@@ -89,6 +101,39 @@ function FactorySlotInput({
     if (amount === undefined || amount === 0) return ""
     return amount.toString()
   }
+
+  // 연결된 제품 토글
+  const handleProductLinkToggle = (productId: string, checked: boolean) => {
+    if (!onLinkedProductsChange) return
+
+    const currentLinked = slot.linkedProductIds ?? []
+    let newLinked: string[]
+
+    if (checked) {
+      newLinked = [...currentLinked, productId]
+    } else {
+      newLinked = currentLinked.filter((id) => id !== productId)
+    }
+
+    onLinkedProductsChange(newLinked)
+  }
+
+  // 전체 선택/해제
+  const handleSelectAll = (checked: boolean) => {
+    if (!onLinkedProductsChange || !products) return
+
+    if (checked) {
+      onLinkedProductsChange(products.map((p) => p.id))
+    } else {
+      onLinkedProductsChange([])
+    }
+  }
+
+  // 현재 연결 상태 (기본값: 모두 연결)
+  const linkedIds = slot.linkedProductIds ?? products?.map((p) => p.id) ?? []
+  const isAllSelected = products ? linkedIds.length === products.length : false
+  const hasProducts = products && products.length > 0
+  const hasMultipleProducts = products && products.length > 1
 
   return (
     <div className="p-3 border border-gray-100 rounded-lg space-y-2">
@@ -132,6 +177,47 @@ function FactorySlotInput({
           </Button>
         )}
       </div>
+
+      {/* 연결된 제품 (공장 선택 + 제품 2개 이상일 때만 표시) */}
+      {slot.factoryId && hasMultipleProducts && (
+        <div className="bg-blue-50/50 rounded px-2 py-1.5 space-y-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 text-xs text-blue-600">
+              <Link2 className="h-3 w-3" />
+              <span>연결 제품</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSelectAll(!isAllSelected)}
+              className="text-xs text-blue-500 hover:text-blue-700"
+            >
+              {isAllSelected ? "전체 해제" : "전체 선택"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {products?.map((product, idx) => {
+              const isLinked = linkedIds.includes(product.id)
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => handleProductLinkToggle(product.id, !isLinked)}
+                  className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                    isLinked
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-500 border border-gray-200 hover:border-blue-300"
+                  }`}
+                >
+                  제품{idx + 1}
+                </button>
+              )
+            })}
+          </div>
+          {linkedIds.length === 0 && (
+            <p className="text-xs text-orange-500">최소 1개 제품을 연결해주세요</p>
+          )}
+        </div>
+      )}
 
       {/* 비용 항목 (공장 선택 시) */}
       {slot.factoryId && factoryCostItems && factoryCostItems.length > 0 && (
@@ -199,6 +285,7 @@ export function AdditionalCostInput({
   selectedPresetId,
   onLoadPreset,
   onSavePreset,
+  products,
 }: AdditionalCostInputProps) {
   // 확장 상태 (기본 3개, 확장 시 6개)
   const visibleSlotCount = slots.length
@@ -276,6 +363,16 @@ export function AdditionalCostInput({
   const handleRemoveSlot = useCallback((slotIndex: number) => {
     if (slots.length <= 2) return
     const newSlots = slots.filter((_, i) => i !== slotIndex)
+    setSlots(newSlots)
+  }, [slots, setSlots])
+
+  // 연결된 제품 변경
+  // 📌 비유: 피자를 나눠 먹을 사람들 선택하기
+  const handleLinkedProductsChange = useCallback((slotIndex: number, productIds: string[]) => {
+    const newSlots = [...slots]
+    const slot = { ...newSlots[slotIndex] }
+    slot.linkedProductIds = productIds
+    newSlots[slotIndex] = slot
     setSlots(newSlots)
   }, [slots, setSlots])
 
@@ -394,6 +491,8 @@ export function AdditionalCostInput({
               onItemDelete={(itemId) => handleItemDelete(index, itemId)}
               onRemove={() => handleRemoveSlot(index)}
               canRemove={slots.length > 2}
+              products={products}
+              onLinkedProductsChange={(productIds) => handleLinkedProductsChange(index, productIds)}
             />
           )
         })}

@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { Id } from "../../../convex/_generated/dataModel"
-import { ProductDimensions, CalculationResult } from "@/types/shipping"
-import type { HsCodeWithTariff } from "@/types/tariff"
+import {
+  Product,
+  MultiProductCalculationResult,
+} from "@/types/shipping"
 import {
   useExchangeRate,
   useShippingCompanies,
@@ -17,30 +19,26 @@ import {
   useCostSettings,
 } from "@/hooks"
 import {
-  calculateImportCost,
-  calculateUnitCbm,
-  calculateTotalCbm,
-  roundCbmToHalf,
+  calculateMultiProductImportCost,
   ShippingRateTable,
+  FactorySlotInput,
 } from "@/lib/calculations"
 
 // 입력 컴포넌트
 import {
-  ProductInfoInput,
-  DimensionsInput,
   ShippingCompanySelector,
   AdditionalCostInput,
   CompanyCostSelector,
-  TariffRateInput,
+  ProductList,
+  createEmptyProduct,
 } from "./input"
 import { FactorySlot, createEmptySlots } from "./input/AdditionalCostInput"
 
 // 결과 컴포넌트
 import {
-  CBMDisplay,
-  CostBreakdown,
   TotalCostCard,
   ExchangeRateDisplay,
+  MultiProductCostBreakdown,
 } from "./result"
 
 // 설정 모달
@@ -63,16 +61,11 @@ export function ImportCalculator() {
   const cnyRate = rates?.CNY?.baseRate ?? null
   const updatedAt = rates?.USD?.updatedAt ?? null
 
-  // ===== 제품 정보 상태 =====
-  const [unitPrice, setUnitPrice] = useState<string>("")
-  const [quantity, setQuantity] = useState<string>("")
-  const [currency, setCurrency] = useState<"USD" | "CNY">("USD")
-  const [dimensions, setDimensions] = useState<ProductDimensions>({
-    width: 10,
-    height: 10,
-    depth: 10,
-  })
-  const [selectedProduct, setSelectedProduct] = useState<HsCodeWithTariff | null>(null)
+  // ===== 다중 제품 상태 =====
+  // 📌 비유: 쇼핑몰 장바구니처럼 여러 제품을 담는 배열
+  const [products, setProducts] = useState<Product[]>(() => [
+    createEmptyProduct("product-1")  // 기본 1개 제품으로 시작
+  ])
 
   // ===== 운송 회사 =====
   const { companies, isLoading: companiesLoading } = useShippingCompanies()
@@ -104,12 +97,11 @@ export function ImportCalculator() {
   // ===== 업체별 공통 비용 =====
   const { items: companyCostItems, isLoading: companyCostsLoading } = useCompanyCosts(selectedCompanyId)
   const [selectedCompanyCostIds, setSelectedCompanyCostIds] = useState<Id<"companyCostItems">[]>([])
-  const [orderCount, setOrderCount] = useState<number>(2)
+  // 주문 건수: 기본값 = 제품 개수, 수동 조절 가능
+  const [orderCount, setOrderCount] = useState<number>(1)
 
-  // ===== 관세율 =====
-  const [basicTariffRate, setBasicTariffRate] = useState<number>(0)
-  const [ftaTariffRate, setFtaTariffRate] = useState<number>(0)
-  const [useFta, setUseFta] = useState<boolean>(true)  // 디폴트: FTA 적용
+  // 제품 개수가 변경되면 주문 건수 자동 업데이트 (사용자가 수동 조절하지 않은 경우)
+  const [isOrderCountManual, setIsOrderCountManual] = useState(false)
 
   // ===== 설정 모달 =====
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -182,59 +174,32 @@ export function ImportCalculator() {
     setHasLoadedDefaultPreset(true)  // 로드 완료 표시
   }, [defaultPreset, hasLoadedDefaultPreset])
 
-  // 기본 제품 자동 선택 (봉제 인형)
+  // 제품 개수 변경 시 주문 건수 자동 업데이트
+  // 📌 비유: 장바구니에 상품을 담으면 자동으로 배송비 계산 단위가 업데이트되는 것
   useEffect(() => {
-    // 이미 선택된 제품이 있으면 스킵
-    if (selectedProduct) return
+    if (!isOrderCountManual) {
+      setOrderCount(products.length)
+    }
+  }, [products.length, isOrderCountManual])
 
-    // 봉제 인형 데이터 가져오기
-    const fetchDefaultProduct = async () => {
-      try {
-        const response = await fetch("/api/tariff/search?q=봉제")
-        const data = await response.json()
+  // 주문 건수 수동 변경 핸들러
+  const handleOrderCountChange = useCallback((count: number) => {
+    setOrderCount(count)
+    setIsOrderCountManual(true)  // 수동 변경 플래그
+  }, [])
 
-        if (data.success && data.data && data.data.length > 0) {
-          // 봉제 인형 찾기
-          const stuffedToy = data.data.find((item: HsCodeWithTariff) =>
-            item.code === "9503003411" || item.nameKo.includes("봉제 인형")
-          )
-
-          if (stuffedToy) {
-            setSelectedProduct(stuffedToy)
-            setBasicTariffRate(stuffedToy.basicRate)
-            setFtaTariffRate(stuffedToy.chinaFtaRate ?? 0)
-          }
-        }
-      } catch (error) {
-        console.error("기본 제품 로딩 실패:", error)
-      }
+  // ===== 다중 제품 계산 결과 =====
+  const calculationResult = useMemo<MultiProductCalculationResult | null>(() => {
+    // 환율 검증
+    if (!usdRate || !cnyRate) {
+      return null
     }
 
-    fetchDefaultProduct()
-  }, []) // 컴포넌트 마운트 시 한 번만 실행
-
-  // ===== CBM 계산 =====
-  const cbmResult = useMemo(() => {
-    const qty = Number(quantity) || 0
-    const unitCbm = calculateUnitCbm(dimensions)
-    const totalCbm = calculateTotalCbm(dimensions, qty)
-    const roundedCbm = roundCbmToHalf(totalCbm)
-
-    return {
-      unitCbm: unitCbm > 0 ? unitCbm : null,
-      totalCbm: totalCbm > 0 ? totalCbm : null,
-      roundedCbm: roundedCbm > 0 ? roundedCbm : null,
-    }
-  }, [dimensions, quantity])
-
-  // ===== 계산 결과 =====
-  const calculationResult = useMemo<CalculationResult | null>(() => {
-    const price = Number(unitPrice) || 0
-    const qty = Number(quantity) || 0
-    const exchangeRate = currency === "USD" ? (usdRate ?? 0) : (cnyRate ?? 0)
-
-    // 필수값 검증
-    if (price <= 0 || qty <= 0 || exchangeRate <= 0) {
+    // 유효한 제품이 있는지 확인 (단가와 수량이 모두 입력된 제품)
+    const hasValidProduct = products.some(
+      (p) => p.unitPrice > 0 && p.quantity > 0
+    )
+    if (!hasValidProduct) {
       return null
     }
 
@@ -247,37 +212,40 @@ export function ImportCalculator() {
         }))
       : []
 
-    // 부대 비용 변환 (공장별 통화 → 원화, 통화 정보 포함)
-    const additionalCostList: { id: string; name: string; amount: number; amountForeign: number; currency: "USD" | "CNY" }[] = []
+    // 공장 슬롯 변환 (다중 제품용)
+    // 📌 현재는 linkedProductIds가 없으므로 모든 제품에 연결
+    // Phase 4에서 UI로 연결 제품을 선택할 수 있도록 추가
+    const factorySlotInputs: FactorySlotInput[] = factorySlots
+      .filter((slot) => slot.factoryId !== null)
+      .map((slot) => {
+        const factory = factories?.find((f) => f._id === slot.factoryId)
+        const costItems = factoryCostItemsMap.get(slot.factoryId!)
 
-    factorySlots.forEach((slot, slotIndex) => {
-      if (!slot.factoryId) return
-
-      const factory = factories?.find((f) => f._id === slot.factoryId)
-      if (!factory) return
-
-      const factoryExchangeRate = factory.currency === "USD" ? (usdRate ?? 0) : (cnyRate ?? 0)
-      const factoryCurrency = factory.currency as "USD" | "CNY"
-      const costItems = factoryCostItemsMap.get(slot.factoryId)
-
-      slot.selectedItemIds.forEach((itemId) => {
-        const item = costItems?.find((i) => i._id === itemId)
-        if (!item) return
-
-        const amountForeign = slot.costValues[itemId] ?? 0
-        if (amountForeign <= 0) return
-
-        additionalCostList.push({
-          id: `slot${slotIndex}-${slot.factoryId}-${itemId}`,
-          name: `${factory.name} - ${item.name}`,
-          amount: amountForeign * factoryExchangeRate,
-          amountForeign,
-          currency: factoryCurrency,
-        })
+        return {
+          factoryId: slot.factoryId as string,
+          factoryName: factory?.name ?? "",
+          currency: (factory?.currency ?? "CNY") as "USD" | "CNY",
+          // 현재 슬롯의 linkedProductIds가 있으면 사용, 없으면 모든 제품에 연결
+          linkedProductIds: slot.linkedProductIds?.length
+            ? slot.linkedProductIds
+            : products.map((p) => p.id),
+          items: slot.selectedItemIds
+            .map((itemId) => {
+              const item = costItems?.find((i) => i._id === itemId)
+              if (!item) return null
+              return {
+                itemId,
+                name: item.name,
+                unitAmount: slot.costValues[itemId] ?? 0,
+                quantity: slot.quantityValues?.[itemId] ?? 1,
+                chargeType: (item.chargeType ?? "once") as "once" | "per_quantity",
+              }
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null),
+        }
       })
-    })
 
-    // 업체별 공통 비용 변환 (부가세 적용 여부 포함)
+    // 업체별 공통 비용 변환
     const companyCosts = selectedCompanyCostIds
       .map((id) => {
         const item = companyCostItems?.find((i) => i._id === id)
@@ -287,29 +255,22 @@ export function ImportCalculator() {
           name: item.name,
           amount: item.defaultAmount,
           isDivisible: item.isDivisible,
-          isVatApplicable: item.isVatApplicable ?? false,  // 부가세 적용 여부
+          isVatApplicable: item.isVatApplicable ?? false,
         }
       })
       .filter((c): c is NonNullable<typeof c> => c !== null)
 
-    // 실제 적용할 관세율 결정
-    const appliedTariffRate = useFta ? ftaTariffRate : basicTariffRate
-
-    // 계산 실행
-    return calculateImportCost({
-      unitPrice: price,
-      quantity: qty,
-      dimensions,
-      exchangeRate,
-      usdRate: usdRate ?? 0,  // 내륙 운송료 환산용
-      tariffRate: appliedTariffRate,
-      basicTariffRate,
-      ftaTariffRate,
-      additionalCosts: additionalCostList,
+    // 다중 제품 계산 실행
+    return calculateMultiProductImportCost({
+      products,
+      exchangeRates: {
+        usd: usdRate,
+        cny: cnyRate,
+      },
+      factorySlots: factorySlotInputs,
       shippingRates: rateTable,
       companyCosts,
       orderCount,
-      // 비용 설정 (DB에서 가져온 값)
       costSettings: {
         inland: inlandConfig,
         domestic: domesticConfig,
@@ -317,15 +278,9 @@ export function ImportCalculator() {
       },
     })
   }, [
-    unitPrice,
-    quantity,
-    currency,
+    products,
     usdRate,
     cnyRate,
-    dimensions,
-    basicTariffRate,
-    ftaTariffRate,
-    useFta,
     factorySlots,
     factories,
     factoryCostItemsMap,
@@ -348,16 +303,6 @@ export function ImportCalculator() {
   const handleFactorySettingsClick = useCallback(() => {
     setSettingsTab("factories")
     setSettingsOpen(true)
-  }, [])
-
-  // 제품 선택 시 관세율 자동 적용
-  const handleTariffRateSelect = useCallback((basicRate: number, ftaRate: number | null) => {
-    setBasicTariffRate(basicRate)
-    if (ftaRate !== null) {
-      setFtaTariffRate(ftaRate)
-    } else {
-      setFtaTariffRate(0)
-    }
   }, [])
 
   // ===== 프리셋 핸들러 =====
@@ -398,6 +343,9 @@ export function ImportCalculator() {
     setSelectedPresetId(newPresetId)  // 새로 저장된 프리셋 선택
   }, [factorySlots, createPreset])
 
+  // 총 수량 계산 (결과 표시용)
+  const totalQuantity = products.reduce((sum, p) => sum + p.quantity, 0)
+
   return (
     <div className="h-screen bg-gray-50">
       {/* 메인 컨텐츠 - 좌우 2단 레이아웃 (50:50) */}
@@ -405,42 +353,23 @@ export function ImportCalculator() {
         <div className="h-full grid grid-cols-2 gap-6">
           {/* 좌측: 입력 영역 */}
           <div className="space-y-3 overflow-y-auto pr-2">
-            {/* 1. 오늘의 환율 (통화 선택) */}
+            {/* 1. 오늘의 환율 (표시 전용, 통화 선택은 제품 카드에서) */}
             <ExchangeRateDisplay
               usdRate={usdRate}
               cnyRate={cnyRate}
-              selectedCurrency={currency}
               updatedAt={updatedAt}
               history={rateHistory}
               onRefresh={refetchRates}
               isLoading={rateLoading}
-              onCurrencyChange={setCurrency}
             />
 
-            {/* 2. 제품 정보 (제품명 + 원가/수량 + 크기 + CBM 통합) */}
+            {/* 2. 제품 목록 (다중 제품 입력) */}
             <div className="bg-white rounded-lg border border-gray-200 p-3">
-              <ProductInfoInput
-                unitPrice={unitPrice}
-                setUnitPrice={setUnitPrice}
-                quantity={quantity}
-                setQuantity={setQuantity}
-                currency={currency}
-                selectedProduct={selectedProduct}
-                setSelectedProduct={setSelectedProduct}
-                onTariffRateSelect={handleTariffRateSelect}
+              <ProductList
+                products={products}
+                setProducts={setProducts}
+                productResults={calculationResult?.products}
               />
-              {/* [제품 단일 크기] [CBM] 2열 배치 */}
-              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-3">
-                <DimensionsInput
-                  dimensions={dimensions}
-                  setDimensions={setDimensions}
-                />
-                <CBMDisplay
-                  unitCbm={cbmResult.unitCbm}
-                  totalCbm={cbmResult.totalCbm}
-                  roundedCbm={cbmResult.roundedCbm}
-                />
-              </div>
             </div>
 
             {/* 3. 중국 공장 추가 비용 */}
@@ -458,10 +387,11 @@ export function ImportCalculator() {
                 selectedPresetId={selectedPresetId}
                 onLoadPreset={handleLoadPreset}
                 onSavePreset={() => setPresetDialogOpen(true)}
+                products={products}
               />
             </div>
 
-            {/* 5. [국제 운송 회사] [업체별 공통 비용] - 2열 그리드 */}
+            {/* 4. [국제 운송 회사] [업체별 공통 비용] - 2열 그리드 */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-lg border border-gray-200 p-3">
                 <ShippingCompanySelector
@@ -481,22 +411,10 @@ export function ImportCalculator() {
                   selectedIds={selectedCompanyCostIds}
                   setSelectedIds={setSelectedCompanyCostIds}
                   orderCount={orderCount}
-                  setOrderCount={setOrderCount}
+                  setOrderCount={handleOrderCountChange}
                   isLoading={companyCostsLoading}
                 />
               </div>
-            </div>
-
-            {/* 6. 관세율 (기본/FTA) */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
-              <TariffRateInput
-                basicTariffRate={basicTariffRate}
-                setBasicTariffRate={setBasicTariffRate}
-                ftaTariffRate={ftaTariffRate}
-                setFtaTariffRate={setFtaTariffRate}
-                useFta={useFta}
-                setUseFta={setUseFta}
-              />
             </div>
           </div>
 
@@ -505,18 +423,18 @@ export function ImportCalculator() {
             {/* 총 수입원가 */}
             <TotalCostCard
               totalCost={calculationResult?.totalCost ?? null}
-              unitCost={calculationResult?.unitCost ?? null}
-              quantity={Number(quantity) || 0}
+              unitCost={null}  // 다중 제품에서는 개당 단가 대신 제품별 단가 표시
+              quantity={totalQuantity}
+              productCount={products.length}
             />
 
-            {/* 비용 상세 내역 */}
-            <CostBreakdown
+            {/* 비용 상세 내역 (다중 제품용) */}
+            <MultiProductCostBreakdown
               result={calculationResult}
-              currency={currency}
-              exchangeRate={currency === "USD" ? usdRate : cnyRate}
+              products={products}
               usdRate={usdRate}
-              useFta={useFta}
-              roundedCbm={cbmResult.roundedCbm}
+              cnyRate={cnyRate}
+              factorySlots={factorySlots}
               costSettings={{
                 inland: inlandConfig,
                 domestic: domesticConfig,

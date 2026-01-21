@@ -1,14 +1,25 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
 
+// 기존 데이터(rateUSD) 또는 신규 데이터(rate)에서 요금 추출
+function getEffectiveRate(record: { rate?: number; rateUSD?: number }): number {
+  return record.rate ?? record.rateUSD ?? 0
+}
+
 // 운임 타입별 운송료 조회
 export const listByRateType = query({
   args: { rateTypeId: v.id("shippingRateTypes") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const rates = await ctx.db
       .query("internationalShippingRates")
       .withIndex("by_rate_type", (q) => q.eq("rateTypeId", args.rateTypeId))
       .collect()
+
+    // rate 필드를 정규화하여 반환
+    return rates.map(r => ({
+      ...r,
+      rate: getEffectiveRate(r),
+    }))
   },
 })
 
@@ -71,7 +82,7 @@ export const calculateRate = query({
     if (exactMatch) {
       return {
         cbm: roundedCbm,
-        rate: exactMatch.rate,
+        rate: getEffectiveRate(exactMatch),
       }
     }
 
@@ -79,14 +90,15 @@ export const calculateRate = query({
     if (roundedCbm < sortedRates[0].cbm) {
       return {
         cbm: sortedRates[0].cbm,
-        rate: sortedRates[0].rate,
+        rate: getEffectiveRate(sortedRates[0]),
       }
     }
 
     const lastRate = sortedRates[sortedRates.length - 1]
     if (roundedCbm > lastRate.cbm) {
       // 마지막 구간의 단가로 계산 (비례 계산)
-      const unitRate = lastRate.rate / lastRate.cbm
+      const effectiveLastRate = getEffectiveRate(lastRate)
+      const unitRate = effectiveLastRate / lastRate.cbm
       return {
         cbm: roundedCbm,
         rate: Math.round(unitRate * roundedCbm * 100) / 100,

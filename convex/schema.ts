@@ -27,7 +27,9 @@ export default defineSchema({
   internationalShippingRates: defineTable({
     rateTypeId: v.id("shippingRateTypes"), // 운임 타입 ID
     cbm: v.number(),                        // CBM (0.5 단위)
-    rate: v.number(),                       // 요금 (통화는 rateType에서 가져옴)
+    rate: v.optional(v.number()),           // 요금 (신규 데이터용, 통화는 rateType에서 가져옴)
+    rateUSD: v.optional(v.number()),        // USD 요금 (기존 데이터 호환용)
+    rateKRW: v.optional(v.number()),        // KRW 요금 (기존 데이터 호환용)
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_rate_type", ["rateTypeId"])

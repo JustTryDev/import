@@ -82,7 +82,9 @@ export interface InternationalShippingRate {
   _id: Id<"internationalShippingRates">
   rateTypeId: Id<"shippingRateTypes">
   cbm: number
-  rate: number  // 요금 (통화는 rateType에서 가져옴)
+  rate?: number       // 요금 (신규 데이터용, 통화는 rateType에서 가져옴)
+  rateUSD?: number    // USD 요금 (기존 데이터 호환용)
+  rateKRW?: number    // KRW 요금 (기존 데이터 호환용)
   createdAt: number
   updatedAt: number
 }

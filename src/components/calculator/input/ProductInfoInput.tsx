@@ -41,6 +41,7 @@ export function ProductInfoInput({
     results: searchResults,
     isLoading: isSearchLoading,
     search,
+    fetchPopular,
     clear: clearSearch,
   } = useTariffSearch()
 
@@ -86,8 +87,8 @@ export function ProductInfoInput({
 
   // 숫자 입력 처리 (소수점 2자리까지 허용)
   const handlePriceChange = (value: string) => {
-    // 숫자와 소수점만 허용
-    const cleaned = value.replace(/[^0-9.]/g, "")
+    // 콤마 제거 후 숫자와 소수점만 허용
+    const cleaned = value.replace(/,/g, "").replace(/[^0-9.]/g, "")
 
     // 소수점이 여러 개인 경우 첫 번째만 유지
     const parts = cleaned.split(".")
@@ -99,6 +100,18 @@ export function ProductInfoInput({
 
     setUnitPrice(result)
   }
+
+  // 단가 표시용 (천 단위 콤마 포맷팅)
+  const formatPriceDisplay = (value: string): string => {
+    if (!value) return ""
+    const parts = value.split(".")
+    // 정수 부분에 콤마 추가
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    // 소수점이 있으면 소수점 부분도 합쳐서 반환
+    return parts.length > 1 ? `${integerPart}.${parts[1]}` : integerPart
+  }
+
+  const formattedUnitPrice = formatPriceDisplay(unitPrice)
 
   const handleQuantityChange = (value: string) => {
     // 콤마 제거 후 숫자만 추출
@@ -159,7 +172,17 @@ export function ProductInfoInput({
               placeholder="HS Code, 제품명(한글/영문) 검색"
               value={searchQuery}
               onChange={handleSearchChange}
-              onFocus={() => searchQuery.length >= 2 && setIsSearchOpen(true)}
+              onFocus={() => {
+                // 📌 검색창 클릭 시 드롭다운 열기
+                // 비유: 유튜브 검색창 클릭하면 추천 검색어가 뜨는 것처럼
+                // 아직 검색 전이면 인기 품목을 보여줍니다.
+                setIsSearchOpen(true)
+
+                // 검색 결과도 없고 검색어도 없으면 인기 품목 불러오기
+                if (searchResults.length === 0 && searchQuery.length < 2) {
+                  fetchPopular()
+                }
+              }}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
             />
 
@@ -226,7 +249,7 @@ export function ProductInfoInput({
               type="text"
               inputMode="decimal"
               placeholder="0.00"
-              value={unitPrice}
+              value={formattedUnitPrice}
               onChange={(e) => handlePriceChange(e.target.value)}
               className="pl-8 text-right"
             />

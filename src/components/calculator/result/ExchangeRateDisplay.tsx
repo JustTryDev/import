@@ -27,8 +27,8 @@ export function ExchangeRateDisplay({
   isLoading,
   onCurrencyChange,
 }: ExchangeRateDisplayProps) {
-  // 테이블 펼침/접힘 상태
-  const [isExpanded, setIsExpanded] = useState(false)
+  // 테이블 펼침/접힘 상태 (기본: 펼침)
+  const [isExpanded, setIsExpanded] = useState(true)
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
@@ -38,7 +38,7 @@ export function ExchangeRateDisplay({
           <span className="text-sm font-medium">오늘의 환율</span>
           {updatedAt && (
             <span className="text-xs text-gray-400">
-              (한국수출입은행 환율 기준 / {updatedAt} 기준)
+              ({updatedAt} 기준)
             </span>
           )}
         </div>
@@ -55,7 +55,7 @@ export function ExchangeRateDisplay({
         )}
       </div>
       <p className="text-xs text-gray-400 mb-3">
-        * 한국수출입은행 매매기준율 기준으로, 실시간 시세와 차이가 있을 수 있음음
+        * 네이버 실시간 환율 API(실패 시 한국수출입은행 환율 API 폴백)
       </p>
 
       {isLoading || !usdRate || !cnyRate ? (
@@ -111,23 +111,25 @@ export function ExchangeRateDisplay({
 
           {/* 최근 5일 환율 (접기/펼치기) */}
           {history.length > 0 && (
-            <div className="mt-3">
+            <div className="mt-4">
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all"
               >
-                {isExpanded ? (
-                  <>
-                    <ChevronUp className="h-3 w-3" />
-                    최근 5일 환율 접기
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-3 w-3" />
-                    최근 5일 환율 보기
-                  </>
-                )}
+                <span className="text-sm font-medium text-gray-700">
+                  최근 5일 환율
+                </span>
+                <div className="flex items-center gap-1 text-primary">
+                  <span className="text-xs font-medium">
+                    {isExpanded ? "접기" : "펼치기"}
+                  </span>
+                  {isExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </div>
               </button>
 
               {/* 테이블 (펼친 상태에서만 표시) */}

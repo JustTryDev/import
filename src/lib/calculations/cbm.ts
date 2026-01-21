@@ -26,9 +26,9 @@ export function roundCbmToHalf(cbm: number): number {
   return Math.ceil(cbm * 2) / 2
 }
 
-// CBM 포맷팅 (소수점 1자리)
+// CBM 포맷팅 (소수점 2자리)
 export function formatCbm(cbm: number): string {
-  return cbm.toFixed(1)
+  return cbm.toFixed(2)
 }
 
 // CBM 유효성 검사

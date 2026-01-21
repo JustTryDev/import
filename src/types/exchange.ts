@@ -26,7 +26,7 @@ export interface ExchangeRate {
   currencyCode: CurrencyCode // 통화 코드 (USD, CNY)
   currencyName: string // 통화명 (미국 달러, 중국 위안)
   baseRate: number // 매매기준율 (1 외화 = ? 원)
-  updatedAt: string // 업데이트 날짜 (YYYY-MM-DD)
+  updatedAt: string // 업데이트 날짜+시간 (YYYY-MM-DD HH:mm)
 }
 
 /**

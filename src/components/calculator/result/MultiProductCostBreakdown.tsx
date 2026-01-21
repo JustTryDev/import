@@ -8,7 +8,15 @@ import {
   Package,
   Receipt,
   Divide,
+  ArrowRight,
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type {
   Product,
   MultiProductCalculationResult,
@@ -53,6 +61,9 @@ export function MultiProductCostBreakdown({
 }: MultiProductCostBreakdownProps) {
   // 제품별 상세 펼침/접힘 상태
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
+
+  // 제품별 마진율 상태 (기본값: 150%)
+  const [marginRates, setMarginRates] = useState<Map<string, number>>(new Map())
 
   // 원화 → 외화 역산 함수
   const toForeignCurrency = (krw: number, currency: "USD" | "CNY") => {
@@ -150,13 +161,13 @@ export function MultiProductCostBreakdown({
 
             return (
               <div key={productResult.productId} className="bg-white">
-                {/* 제품 헤더 (클릭하여 접기/펼치기) */}
-                <button
-                  type="button"
-                  onClick={() => toggleProduct(productResult.productId)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
+                {/* 제품 헤더 */}
+                <div className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                  {/* 좌측: 제품 정보 (클릭하여 접기/펼치기) */}
+                  <div
+                    className="flex items-center gap-3 cursor-pointer flex-1"
+                    onClick={() => toggleProduct(productResult.productId)}
+                  >
                     <div>
                       {/* 제품 순서 + 품목명 */}
                       <div className="text-sm font-medium text-gray-700 text-left">
@@ -174,22 +185,60 @@ export function MultiProductCostBreakdown({
                       </div>
                     </div>
                   </div>
+                  {/* 우측: 가격 정보 + 펼침/접힘 버튼 */}
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <div className="text-sm font-bold text-primary">
-                        개당 {formatNumberWithCommas(productResult.unitCost)}원
+                      {/* 개당 원가 + 마진율 드롭다운 + 판매가 */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-primary">
+                          개당 {formatNumberWithCommas(productResult.unitCost)}원
+                        </span>
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                        <Select
+                          value={String(marginRates.get(productResult.productId) ?? 200)}
+                          onValueChange={(value) => {
+                            setMarginRates(prev => {
+                              const next = new Map(prev)
+                              next.set(productResult.productId, Number(value))
+                              return next
+                            })
+                          }}
+                        >
+                          <SelectTrigger className="h-6 w-[80px] text-xs">
+                            <SelectValue placeholder="100%">
+                              {(marginRates.get(productResult.productId) ?? 200) - 100}%
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[150, 160, 170, 180, 190, 200].map(rate => (
+                              <SelectItem key={rate} value={String(rate)}>{rate - 100}%</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-gray-400">=</span>
+                        <span className="text-sm font-bold text-green-600">
+                          {formatNumberWithCommas(Math.round(productResult.unitCost * (marginRates.get(productResult.productId) ?? 200) / 100))}원
+                        </span>
+                        <span className="text-xs text-gray-400">(VAT 미포함)</span>
                       </div>
                       <div className="text-xs text-gray-500">
                         총 {formatNumberWithCommas(productResult.totalCost)}원
                       </div>
                     </div>
-                    {isExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
-                    )}
+                    {/* 펼침/접힘 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => toggleProduct(productResult.productId)}
+                      className="p-1 hover:bg-gray-100 rounded"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
                   </div>
-                </button>
+                </div>
 
                 {/* 제품 상세 (펼친 상태) */}
                 {isExpanded && (
@@ -249,6 +298,21 @@ export function MultiProductCostBreakdown({
                         foreignValue={formatForeign(toForeignCurrency(productResult.sharedCosts.inlandShipping, "USD"), "USD")}
                         subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
+
+                      {/* 4. 송금 & 결제 수수료 (제품 수로 균등 분배) */}
+                      {(() => {
+                        const totalRemittance = result.sharedCostsTotal.remittanceFee
+                        const distributedRemittance = Math.round(totalRemittance / products.length)
+                        return (
+                          <CostRow
+                            label="송금 & 결제 수수료"
+                            value={distributedRemittance}
+                            badge={paymentMethodForDetail}
+                            badgeVariant={isWireTransferForDetail ? "dark" : "light"}
+                            subLabel={<><Divide className="h-3 w-3" /> {products.length}</>}
+                          />
+                        )
+                      })()}
                     </div>
 
                     {/* ===== 가로선: 내륙운송료 아래 ===== */}
@@ -306,24 +370,9 @@ export function MultiProductCostBreakdown({
                     {/* ===== 가로선 1 ===== */}
                     <div className="border-t border-gray-200 my-1" />
 
-                    {/* ===== 섹션 2: 송금수수료 + 국제운송료 + D/O + C/O ===== */}
+                    {/* ===== 섹션 2: 국제운송료 + D/O + C/O ===== */}
                     <div className="space-y-1 py-2">
-                      {/* 6. 송금 & 결제 수수료 (제품 수로 균등 분배) */}
-                      {(() => {
-                        const totalRemittance = result.sharedCostsTotal.remittanceFee
-                        const distributedRemittance = Math.round(totalRemittance / products.length)
-                        return (
-                          <CostRow
-                            label="송금 & 결제 수수료"
-                            value={distributedRemittance}
-                            badge={paymentMethodForDetail}
-                            badgeVariant={isWireTransferForDetail ? "dark" : "light"}
-                            subLabel={<><Divide className="h-3 w-3" /> {products.length}</>}
-                          />
-                        )
-                      })()}
-
-                      {/* 7. 국제운송료 */}
+                      {/* 5. 국제운송료 */}
                       <CostRowWithForeign
                         label="국제 운송료"
                         value={productResult.sharedCosts.internationalShipping}
@@ -526,11 +575,12 @@ function TotalCostBreakdown({
 
   // ===== 섹션별 비용 계산 =====
 
-  // 1. 제품 원가 섹션
+  // 1. 제품 원가 섹션 (송금 수수료 포함)
   const productCostTotal = result.breakdown.productCost
   const additionalCostTotal = result.breakdown.factoryCosts
   const inlandShippingTotal = result.sharedCostsTotal.inlandShipping
-  const productSectionTotal = productCostTotal + additionalCostTotal + inlandShippingTotal
+  const remittanceFee = result.sharedCostsTotal.remittanceFee
+  const productSectionTotal = productCostTotal + additionalCostTotal + inlandShippingTotal + remittanceFee
 
   // 2. 세금 섹션 (관세 + 국외 부가세)
   const tariffTotal = result.breakdown.tariff
@@ -538,8 +588,7 @@ function TotalCostBreakdown({
   const foreignVatTotal = result.products.reduce((sum, p) => sum + p.vatAmount, 0)
   const taxSectionTotal = tariffTotal + foreignVatTotal
 
-  // 3. 국제 물류 섹션
-  const remittanceFee = result.sharedCostsTotal.remittanceFee
+  // 3. 국제 물류 섹션 (송금 수수료 제외)
   const internationalShipping = result.sharedCostsTotal.internationalShipping
   // 통관 수수료를 제외한 업체 공통 비용 (D/O, C/O 등)
   const companyCostsWithoutCustoms = result.companyCostsDetail?.filter(
@@ -548,7 +597,7 @@ function TotalCostBreakdown({
   const companyCostsWithoutCustomsTotal = companyCostsWithoutCustoms.reduce(
     (sum, item) => sum + item.dividedAmount, 0
   )
-  const internationalSectionTotal = remittanceFee + internationalShipping + companyCostsWithoutCustomsTotal
+  const internationalSectionTotal = internationalShipping + companyCostsWithoutCustomsTotal
 
   // 4. 국내 통관 및 물류 섹션
   // 통관 수수료
@@ -613,6 +662,12 @@ function TotalCostBreakdown({
             value={inlandShippingTotal}
             foreignValue={formatUSD(toUSD(inlandShippingTotal))}
           />
+          <SectionCostRow
+            label="송금 & 결제 수수료"
+            value={remittanceFee}
+            badge={paymentMethod}
+            badgeVariant={isWireTransfer ? "dark" : "light"}
+          />
         </CostSection>
 
         {/* ===== 섹션 2: 제품 세금 ===== */}
@@ -631,12 +686,6 @@ function TotalCostBreakdown({
           sectionTotal={internationalSectionTotal}
           percentage={getPercentage(internationalSectionTotal)}
         >
-          <SectionCostRow
-            label="송금 & 결제 수수료"
-            value={remittanceFee}
-            badge={paymentMethod}
-            badgeVariant={isWireTransfer ? "dark" : "light"}
-          />
           <SectionCostRow
             label={`국제 운송료 (${result.totalCbm.toFixed(2)}CBM → ${result.roundedCbm.toFixed(1)}CBM 적용)`}
             value={internationalShipping}

@@ -218,10 +218,21 @@ export function calculateMultiProductImportCost(
   )
 
   // ===== 6. 제품별 총 비용 및 개당 단가 계산 =====
+
+  // 먼저 송금 수수료 분배 비율을 미리 계산 (부가세 계산에 필요)
+  const productRemittanceFeeShares = new Map(
+    productsWithTariff.map(product => {
+      const productPriceRatio = product.productPriceKRW / totalProductPriceKRW
+      const remittanceFeeShare = Math.round(remittanceFee * productPriceRatio)
+      return [product.id, remittanceFeeShare]
+    })
+  )
+
   const productResults: ProductCalculationResult[] = productsWithTariff.map(product => {
     const factoryCostData = factoryCostMap.get(product.id) ?? { totalCostKRW: 0, details: [] }
     const factoryCost = factoryCostData.totalCostKRW
     const sharedCosts = sharedCostsDistribution.get(product.id)!
+    const remittanceFeeShare = productRemittanceFeeShares.get(product.id) ?? 0
 
     // 관세 재계산 (공장비용 포함)
     const { taxableBase, tariffAmount } = calculateTariff(
@@ -229,8 +240,8 @@ export function calculateMultiProductImportCost(
       factoryCost,  // 공장비용을 부대비용으로 포함
       product.tariffRate
     )
-    // 부가세 계산: (제품가격 + 공장비용 + 내륙운송료) × 10% (관세 제외!)
-    const { vatAmount } = calculateVat(taxableBase, sharedCosts.inlandShipping)
+    // 부가세 계산: (제품가격 + 공장비용 + 내륙운송료 + 송금수수료) × 10% (관세 제외!)
+    const { vatAmount } = calculateVat(taxableBase, sharedCosts.inlandShipping + remittanceFeeShare)
 
     // CBM 비율에 따른 국내 관련 부가세 분배
     const domesticVat = Math.round(
@@ -239,10 +250,6 @@ export function calculateMultiProductImportCost(
 
     // 업체 공통 비용 분배 (주문 건수로 이미 분할된 금액을 제품 수로 재분배)
     const companyCostShare = Math.round(totalCompanyCostsKRW / validProducts.length)
-
-    // 송금 수수료 분배 (제품가격 비율)
-    const productPriceRatio = product.productPriceKRW / totalProductPriceKRW
-    const remittanceFeeShare = Math.round(remittanceFee * productPriceRatio)
 
     // 제품별 총 비용
     const totalCost = Math.round(

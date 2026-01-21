@@ -2,6 +2,11 @@
 
 import { formatNumberWithCommas, formatForeignCurrency } from "@/lib/format"
 import { CalculationResult } from "@/types/shipping"
+import type {
+  InlandConfig,
+  DomesticConfig,
+  ThreePLConfig,
+} from "@/hooks/useCostSettings"
 
 interface CostBreakdownProps {
   result: CalculationResult | null
@@ -12,6 +17,12 @@ interface CostBreakdownProps {
   useFta: boolean               // FTA 적용 여부
   // CBM 관련
   roundedCbm?: number | null    // 적용 CBM (0.5 단위 올림)
+  // 비용 설정 (설명 표시용)
+  costSettings?: {
+    inland?: InlandConfig
+    domestic?: DomesticConfig
+    threePL?: ThreePLConfig
+  }
 }
 
 // 비용 항목 행 컴포넌트
@@ -210,6 +221,7 @@ export function CostBreakdown({
   usdRate,
   useFta,
   roundedCbm,
+  costSettings,
 }: CostBreakdownProps) {
   if (!result) {
     return (
@@ -278,7 +290,7 @@ export function CostBreakdown({
             label="내륙 운송료"
             amountUSD={result.inlandShippingUSD}
             amountKRW={result.inlandShippingKRW}
-            subLabel="(1CBM당 $70)"
+            subLabel={`(1CBM당 $${costSettings?.inland?.ratePerCbm ?? 70})`}
           />
         )}
 
@@ -348,14 +360,14 @@ export function CostBreakdown({
         <CostRow
           label="국내 운송료"
           amount={breakdown.domesticShipping}
-          subLabel="(0.5CBM 50,000원, 0.1CBM당 10,000원)"
+          subLabel={`(${costSettings?.domestic?.baseCbm ?? 0.5}CBM ${(costSettings?.domestic?.baseFee ?? 50000).toLocaleString()}원, ${costSettings?.domestic?.extraUnit ?? 0.1}CBM당 ${(costSettings?.domestic?.extraRate ?? 10000).toLocaleString()}원)`}
         />
 
         {/* 3PL 비용 + 배송비 */}
         <CostRow
           label="3PL 비용 + 배송비"
           amount={breakdown.threePLCost}
-          subLabel="(0.1CBM당 15,000원)"
+          subLabel={`(${costSettings?.threePL?.unit ?? 0.1}CBM당 ${(costSettings?.threePL?.ratePerUnit ?? 15000).toLocaleString()}원)`}
         />
 
         <Divider />

@@ -517,6 +517,11 @@ export function ImportCalculator() {
               usdRate={usdRate}
               useFta={useFta}
               roundedCbm={cbmResult.roundedCbm}
+              costSettings={{
+                inland: inlandConfig,
+                domestic: domesticConfig,
+                threePL: threePLConfig,
+              }}
             />
           </div>
         </div>

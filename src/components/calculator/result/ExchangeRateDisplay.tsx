@@ -27,8 +27,8 @@ export function ExchangeRateDisplay({
   isLoading,
   onCurrencyChange,
 }: ExchangeRateDisplayProps) {
-  // 테이블 펼침/접힘 상태 (기본: 펼침)
-  const [isExpanded, setIsExpanded] = useState(true)
+  // 테이블 펼침/접힘 상태 (기본: 접힘)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">

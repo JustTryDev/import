@@ -24,6 +24,7 @@ export interface FactoryPreset {
   _id: Id<"factoryPresets">
   name: string
   slots: PresetSlot[]
+  isDefault?: boolean              // 기본 프리셋 여부
   sortOrder: number
   createdAt: number
   updatedAt: number
@@ -37,6 +38,8 @@ export function useFactoryPresets() {
   const createPreset = useMutation(api.factoryPresets.create)
   const updatePreset = useMutation(api.factoryPresets.update)
   const removePreset = useMutation(api.factoryPresets.remove)
+  const setDefaultPreset = useMutation(api.factoryPresets.setDefault)
+  const clearDefaultPreset = useMutation(api.factoryPresets.clearDefault)
 
   // 정렬된 프리셋 목록 (sortOrder 기준)
   const sortedPresets = useMemo(() => {
@@ -44,11 +47,20 @@ export function useFactoryPresets() {
     return [...presets].sort((a, b) => a.sortOrder - b.sortOrder)
   }, [presets])
 
+  // 기본 프리셋 찾기
+  const defaultPreset = useMemo(() => {
+    if (!presets) return undefined
+    return presets.find((p) => p.isDefault === true) as FactoryPreset | undefined
+  }, [presets])
+
   return {
     presets: sortedPresets as FactoryPreset[] | undefined,
+    defaultPreset,                    // 기본 프리셋 (있으면 반환)
     isLoading: presets === undefined,
     createPreset,
     updatePreset,
     removePreset,
+    setDefaultPreset,                 // 기본 프리셋 설정
+    clearDefaultPreset,               // 기본 프리셋 해제
   }
 }

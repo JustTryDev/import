@@ -9,7 +9,7 @@
  * - 프리셋 삭제
  */
 import { useState } from "react"
-import { Trash2, Edit2, Check, X, Bookmark } from "lucide-react"
+import { Trash2, Edit2, Check, X, Bookmark, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useFactoryPresets } from "@/hooks"
@@ -17,7 +17,7 @@ import { useFactories, useAllFactoryCostItems } from "@/hooks"
 import { Id } from "../../../../convex/_generated/dataModel"
 
 export function PresetManager() {
-  const { presets, isLoading, updatePreset, removePreset } = useFactoryPresets()
+  const { presets, isLoading, updatePreset, removePreset, setDefaultPreset, clearDefaultPreset } = useFactoryPresets()
   const { factories } = useFactories()
   const { costItemsMap } = useAllFactoryCostItems()
 
@@ -53,6 +53,17 @@ export function PresetManager() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`"${name}" 프리셋을 삭제하시겠습니까?`)) return
     await removePreset({ id: id as Id<"factoryPresets"> })
+  }
+
+  // 기본 프리셋 토글
+  const handleToggleDefault = async (id: string, currentIsDefault: boolean) => {
+    if (currentIsDefault) {
+      // 기본 해제
+      await clearDefaultPreset({ id: id as Id<"factoryPresets"> })
+    } else {
+      // 기본으로 설정
+      await setDefaultPreset({ id: id as Id<"factoryPresets"> })
+    }
   }
 
   // 프리셋 내용 요약 생성
@@ -142,6 +153,20 @@ export function PresetManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* 기본 프리셋 설정 버튼 */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleDefault(preset._id, preset.isDefault ?? false)}
+                      className={`h-8 w-8 p-0 ${
+                        preset.isDefault
+                          ? "text-yellow-500 hover:text-yellow-600"
+                          : "text-gray-300 hover:text-yellow-500"
+                      }`}
+                      title={preset.isDefault ? "기본 프리셋 해제" : "기본 프리셋으로 설정"}
+                    >
+                      <Star className={`h-4 w-4 ${preset.isDefault ? "fill-yellow-500" : ""}`} />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

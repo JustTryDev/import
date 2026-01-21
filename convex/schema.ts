@@ -79,6 +79,7 @@ export default defineSchema({
       selectedItemIds: v.array(v.string()), // 선택된 비용 항목 IDs
       costValues: v.any(),                  // { [itemId]: number } 형태 (항목별 금액)
     })),
+    isDefault: v.optional(v.boolean()),     // 기본 프리셋 여부 (페이지 로드 시 자동 적용)
     sortOrder: v.number(),                  // 정렬 순서
     createdAt: v.number(),
     updatedAt: v.number(),

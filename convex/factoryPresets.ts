@@ -86,3 +86,31 @@ export const remove = mutation({
     return await ctx.db.delete(args.id)
   },
 })
+
+// 기본 프리셋 설정
+// 📌 비유: 카페에서 "기본 메뉴"로 설정해두면 앱 열 때마다 자동 선택되는 것처럼
+export const setDefault = mutation({
+  args: { id: v.id("factoryPresets") },
+  handler: async (ctx, args) => {
+    const now = Date.now()
+
+    // 기존 기본 프리셋 해제 (다른 프리셋들의 isDefault를 false로)
+    const allPresets = await ctx.db.query("factoryPresets").collect()
+    for (const preset of allPresets) {
+      if (preset.isDefault && preset._id !== args.id) {
+        await ctx.db.patch(preset._id, { isDefault: false, updatedAt: now })
+      }
+    }
+
+    // 선택한 프리셋을 기본으로 설정
+    return await ctx.db.patch(args.id, { isDefault: true, updatedAt: now })
+  },
+})
+
+// 기본 프리셋 해제
+export const clearDefault = mutation({
+  args: { id: v.id("factoryPresets") },
+  handler: async (ctx, args) => {
+    return await ctx.db.patch(args.id, { isDefault: false, updatedAt: Date.now() })
+  },
+})

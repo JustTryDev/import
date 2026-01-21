@@ -92,14 +92,15 @@ export function ImportCalculator() {
   const [factorySlots, setFactorySlots] = useState<FactorySlot[]>(() => createEmptySlots(2))
 
   // ===== 프리셋 (즐겨찾기) =====
-  const { presets, createPreset } = useFactoryPresets()
+  const { presets, defaultPreset, createPreset } = useFactoryPresets()
   const [presetDialogOpen, setPresetDialogOpen] = useState(false)
   const [selectedPresetId, setSelectedPresetId] = useState<Id<"factoryPresets"> | null>(null)
+  const [hasLoadedDefaultPreset, setHasLoadedDefaultPreset] = useState(false) // 기본 프리셋 로드 여부
 
   // ===== 업체별 공통 비용 =====
   const { items: companyCostItems, isLoading: companyCostsLoading } = useCompanyCosts(selectedCompanyId)
   const [selectedCompanyCostIds, setSelectedCompanyCostIds] = useState<Id<"companyCostItems">[]>([])
-  const [orderCount, setOrderCount] = useState<number>(1)
+  const [orderCount, setOrderCount] = useState<number>(2)
 
   // ===== 관세율 =====
   const [basicTariffRate, setBasicTariffRate] = useState<number>(0)
@@ -150,6 +151,32 @@ export function ImportCalculator() {
       }
     }
   }, [companyCostItems])
+
+  // 기본 프리셋 자동 적용 (페이지 로드 시 1회만)
+  useEffect(() => {
+    // 이미 로드했거나, 기본 프리셋이 없으면 스킵
+    if (hasLoadedDefaultPreset || !defaultPreset) return
+
+    // 기본 프리셋을 슬롯에 적용
+    const newSlots: FactorySlot[] = defaultPreset.slots.map((slot) => ({
+      factoryId: slot.factoryId as Id<"factories"> | null,
+      selectedItemIds: slot.selectedItemIds,
+      costValues: slot.costValues as { [itemId: string]: number },
+    }))
+
+    // 최소 2개 슬롯 보장
+    while (newSlots.length < 2) {
+      newSlots.push({
+        factoryId: null,
+        selectedItemIds: [],
+        costValues: {},
+      })
+    }
+
+    setFactorySlots(newSlots)
+    setSelectedPresetId(defaultPreset._id)
+    setHasLoadedDefaultPreset(true)  // 로드 완료 표시
+  }, [defaultPreset, hasLoadedDefaultPreset])
 
   // 기본 제품 자동 선택 (봉제 인형)
   useEffect(() => {

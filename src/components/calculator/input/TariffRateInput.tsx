@@ -53,7 +53,20 @@ export function TariffRateInput({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-medium text-gray-700">관세율</h3>
+      {/* 제목 + FTA 적용 체크박스 (같은 라인) */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-700">관세율</h3>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="useFta"
+            checked={useFta}
+            onCheckedChange={(checked) => setUseFta(!!checked)}
+          />
+          <Label htmlFor="useFta" className="text-xs text-gray-600 cursor-pointer">
+            한-중 FTA 관세율 적용
+          </Label>
+        </div>
+      </div>
 
       {/* 2열 그리드: 기본 관세율 / 한-중 FTA 관세율 */}
       <div className="grid grid-cols-2 gap-3">
@@ -135,19 +148,6 @@ export function TariffRateInput({
           </div>
         </div>
       </div>
-
-      {/* FTA 적용 체크박스 */}
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="useFta"
-          checked={useFta}
-          onCheckedChange={(checked) => setUseFta(!!checked)}
-        />
-        <Label htmlFor="useFta" className="text-xs text-gray-600 cursor-pointer">
-          한-중 FTA 관세율 적용
-        </Label>
-      </div>
-
     </div>
   )
 }

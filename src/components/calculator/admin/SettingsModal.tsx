@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building2, Truck, DollarSign, Factory, Bookmark } from "lucide-react"
+import { Building2, Truck, DollarSign, Factory, Bookmark, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,9 +23,10 @@ import { ShippingRateManager } from "./ShippingRateManager"
 import { CompanyCostManager } from "./CompanyCostManager"
 import { FactoryManager } from "./FactoryManager"
 import { PresetManager } from "./PresetManager"
+import { CostSettingsManager } from "./CostSettingsManager"
 
 // 탭 타입
-type SettingsTab = "companies" | "rates" | "companyCosts" | "factories" | "presets"
+type SettingsTab = "companies" | "rates" | "companyCosts" | "factories" | "presets" | "costSettings"
 
 interface SettingsModalProps {
   open: boolean
@@ -85,7 +86,7 @@ export function SettingsModal({
           onValueChange={(v) => setActiveTab(v as SettingsTab)}
           className="flex-1 flex flex-col min-h-0"
         >
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-6 w-full">
             <TabsTrigger value="companies" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">운송 업체</span>
@@ -105,6 +106,10 @@ export function SettingsModal({
             <TabsTrigger value="presets" className="flex items-center gap-2">
               <Bookmark className="h-4 w-4" />
               <span className="hidden sm:inline">프리셋</span>
+            </TabsTrigger>
+            <TabsTrigger value="costSettings" className="flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">비용 설정</span>
             </TabsTrigger>
           </TabsList>
 
@@ -133,6 +138,11 @@ export function SettingsModal({
             {/* 프리셋 관리 */}
             <TabsContent value="presets" className="mt-0">
               <PresetManager />
+            </TabsContent>
+
+            {/* 비용 설정 관리 */}
+            <TabsContent value="costSettings" className="mt-0">
+              <CostSettingsManager />
             </TabsContent>
           </div>
         </Tabs>

@@ -1,5 +1,7 @@
 /**
  * 운송료 계산 로직
+ *
+ * 📌 설정값을 옵셔널 파라미터로 받아 DB 값 또는 기본값 사용
  */
 
 // 국제 운송료 계산 결과
@@ -9,37 +11,66 @@ export interface InternationalShippingResult {
   rateKRW: number
 }
 
+// 국내 운송료 설정 타입
+export interface DomesticShippingConfig {
+  baseFee: number     // 기본료 (원)
+  baseCbm: number     // 기본 CBM
+  extraUnit: number   // 추가 단위 (CBM)
+  extraRate: number   // 추가 요금 (원/단위)
+}
+
+// 3PL 비용 설정 타입
+export interface ThreePLCostConfig {
+  ratePerUnit: number // 단위당 요금 (원)
+  unit: number        // 단위 (CBM)
+}
+
+// 기본값 (DB에 데이터가 없을 때 사용)
+const DEFAULT_DOMESTIC_CONFIG: DomesticShippingConfig = {
+  baseFee: 50_000,
+  baseCbm: 0.5,
+  extraUnit: 0.1,
+  extraRate: 10_000,
+}
+
+const DEFAULT_3PL_CONFIG: ThreePLCostConfig = {
+  ratePerUnit: 15_000,
+  unit: 0.1,
+}
+
 // 국내 운송료 계산
 // 기본료: 50,000원 (0.5CBM까지)
 // 추가료: 0.1CBM당 10,000원
-export function calculateDomesticShipping(cbm: number): number {
-  const BASE_FEE = 50_000        // 기본료 (원)
-  const BASE_CBM = 0.5           // 기본 CBM
-  const EXTRA_UNIT = 0.1         // 추가 단위 (CBM)
-  const EXTRA_RATE = 10_000      // 추가 요금 (원/0.1CBM)
+export function calculateDomesticShipping(
+  cbm: number,
+  config?: DomesticShippingConfig
+): number {
+  const { baseFee, baseCbm, extraUnit, extraRate } = config ?? DEFAULT_DOMESTIC_CONFIG
 
   if (cbm <= 0) return 0
-  if (cbm <= BASE_CBM) return BASE_FEE
+  if (cbm <= baseCbm) return baseFee
 
-  // 0.5CBM 초과분 계산 (0.1 단위로 올림)
-  const extraCbm = cbm - BASE_CBM
-  const extraUnits = Math.ceil(extraCbm / EXTRA_UNIT)
-  const extraFee = extraUnits * EXTRA_RATE
+  // 기준 CBM 초과분 계산 (단위로 올림)
+  const extraCbm = cbm - baseCbm
+  const extraUnits = Math.ceil(extraCbm / extraUnit)
+  const extraFee = extraUnits * extraRate
 
-  return BASE_FEE + extraFee
+  return baseFee + extraFee
 }
 
 // 3PL 비용 + 배송비 계산
 // 0.1CBM당 15,000원
-export function calculate3PLCost(cbm: number): number {
-  const RATE_PER_UNIT = 15_000   // 0.1CBM당 요금 (원)
-  const UNIT = 0.1               // 단위 (CBM)
+export function calculate3PLCost(
+  cbm: number,
+  config?: ThreePLCostConfig
+): number {
+  const { ratePerUnit, unit } = config ?? DEFAULT_3PL_CONFIG
 
   if (cbm <= 0) return 0
 
-  // 0.1 단위로 올림하여 계산
-  const units = Math.ceil(cbm / UNIT)
-  return units * RATE_PER_UNIT
+  // 단위로 올림하여 계산
+  const units = Math.ceil(cbm / unit)
+  return units * ratePerUnit
 }
 
 // 송금 수수료 계산
@@ -55,12 +86,25 @@ export function calculateRemittanceFee(amountKRW: number): number {
   return Math.round(amountKRW * PERCENTAGE)
 }
 
+// 내륙 운송료 설정 타입
+export interface InlandShippingConfig {
+  ratePerCbm: number  // CBM당 USD 단가
+}
+
+// 기본값
+const DEFAULT_INLAND_CONFIG: InlandShippingConfig = {
+  ratePerCbm: 70,
+}
+
 // 내륙 운송료 계산 (중국 공장 → 항구)
 // CBM당 $70 기준
-export function calculateInlandShipping(cbm: number): number {
-  const RATE_PER_CBM = 70  // USD/CBM
+export function calculateInlandShipping(
+  cbm: number,
+  config?: InlandShippingConfig
+): number {
+  const { ratePerCbm } = config ?? DEFAULT_INLAND_CONFIG
   if (cbm <= 0) return 0
-  return Math.round(cbm * RATE_PER_CBM * 100) / 100  // 소수점 2자리
+  return Math.round(cbm * ratePerCbm * 100) / 100  // 소수점 2자리
 }
 
 // 국제 운송료 조회용 인터페이스 (CBM 테이블에서 조회)

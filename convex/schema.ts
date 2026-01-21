@@ -84,4 +84,19 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
+
+  // 비용 설정 (내륙운송료, 국내운송료, 3PL비용 등)
+  // 📌 비유: 택시 기본요금/추가요금처럼 비용 계산 기준을 설정
+  costSettings: defineTable({
+    type: v.string(),                       // 설정 타입 ("inland", "domestic", "3pl")
+    name: v.string(),                       // 표시 이름 (예: "내륙 운송료")
+    description: v.optional(v.string()),    // 설명
+    config: v.any(),                        // 설정값 (타입별로 다른 구조)
+    // inland: { ratePerCbm: number (USD) }
+    // domestic: { baseFee: number, baseCbm: number, extraUnit: number, extraRate: number }
+    // 3pl: { ratePerUnit: number, unit: number }
+    isActive: v.boolean(),                  // 활성화 여부
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_type", ["type"]),
 })

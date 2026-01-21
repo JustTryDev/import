@@ -28,6 +28,9 @@ import {
   findShippingRate,
   calculate3PLCost,
   ShippingRateTable,
+  DomesticShippingConfig,
+  ThreePLCostConfig,
+  InlandShippingConfig,
 } from "./shipping"
 import {
   calculateCompanyCosts,
@@ -75,6 +78,13 @@ export interface CalculateImportCostParams {
   // 업체별 공통 비용
   companyCosts: CostItemInput[]
   orderCount: number             // 주문 건수 (분할용)
+
+  // 비용 설정 (DB에서 가져온 값, 없으면 기본값 사용)
+  costSettings?: {
+    inland?: InlandShippingConfig      // 내륙 운송료 설정
+    domestic?: DomesticShippingConfig  // 국내 운송료 설정
+    threePL?: ThreePLCostConfig        // 3PL 비용 설정
+  }
 }
 
 // 수입원가 계산 메인 함수
@@ -94,6 +104,7 @@ export function calculateImportCost(
     shippingRates,
     companyCosts,
     orderCount,
+    costSettings,
   } = params
 
   // 유효성 검사
@@ -120,8 +131,8 @@ export function calculateImportCost(
   }))
   const totalAdditionalCosts = additionalCosts.reduce((sum, item) => sum + item.amount, 0)
 
-  // 3.5 내륙 운송료 계산 (중국 공장 → 항구, CBM당 $70)
-  const inlandShippingUSD = calculateInlandShipping(totalCbm)
+  // 3.5 내륙 운송료 계산 (중국 공장 → 항구)
+  const inlandShippingUSD = calculateInlandShipping(totalCbm, costSettings?.inland)
   const inlandShippingKRW = Math.round(inlandShippingUSD * usdRate)
 
   // 4. 관세 계산 (과세가격 = 제품가격 + 부대비용)
@@ -153,10 +164,10 @@ export function calculateImportCost(
   const internationalShippingKRW = shippingResult?.rateKRW ?? 0
 
   // 7. 국내 운송료
-  const domesticShippingKRW = calculateDomesticShipping(totalCbm)
+  const domesticShippingKRW = calculateDomesticShipping(totalCbm, costSettings?.domestic)
 
-  // 7.5 3PL 비용 + 배송비 (0.1CBM당 15,000원)
-  const threePLCostKRW = calculate3PLCost(totalCbm)
+  // 7.5 3PL 비용 + 배송비
+  const threePLCostKRW = calculate3PLCost(totalCbm, costSettings?.threePL)
 
   // 8. 송금 수수료 (기준: 제품가격 + 부대비용 + 내륙운송료)
   const remittanceFeeBase = totalPriceKRW + totalAdditionalCosts + inlandShippingKRW
@@ -332,6 +343,12 @@ export {
 
 export type {
   ShippingRateTable,
+  DomesticShippingConfig,
+  ThreePLCostConfig,
+  InlandShippingConfig,
+} from "./shipping"
+
+export type {
   CostItemInput,
   AdditionalCostInput,
-}
+} from "./costs"

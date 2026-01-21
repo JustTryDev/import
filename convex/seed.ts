@@ -233,6 +233,55 @@ export const seedInitialData = mutation({
       }
     }
 
+    // 8. 비용 설정 생성 (내륙운송료, 국내운송료, 3PL)
+    const existingCostSettings = await ctx.db.query("costSettings").first()
+    let costSettingsCount = 0
+
+    if (!existingCostSettings) {
+      // 내륙 운송료 (중국 공장 → 항구)
+      await ctx.db.insert("costSettings", {
+        type: "inland",
+        name: "내륙 운송료",
+        description: "중국 공장에서 항구까지의 운송 비용 (CBM당 USD)",
+        config: { ratePerCbm: 70 },
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      // 국내 운송료 (항구 → 창고)
+      await ctx.db.insert("costSettings", {
+        type: "domestic",
+        name: "국내 운송료",
+        description: "항구에서 창고까지의 운송 비용",
+        config: {
+          baseFee: 50000,
+          baseCbm: 0.5,
+          extraUnit: 0.1,
+          extraRate: 10000,
+        },
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      // 3PL + 배송비
+      await ctx.db.insert("costSettings", {
+        type: "3pl",
+        name: "3PL + 배송비",
+        description: "물류대행 및 최종 배송 비용",
+        config: {
+          ratePerUnit: 15000,
+          unit: 0.1,
+        },
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      costSettingsCount = 3
+    }
+
     return {
       message: "초기 데이터 시드 완료",
       seeded: true,
@@ -242,6 +291,7 @@ export const seedInitialData = mutation({
       costItemsCount: costItems.length,
       factoriesCount: factories.length,
       factoryCostItemsCount,
+      costSettingsCount,
     }
   },
 })
@@ -258,6 +308,7 @@ export const resetAllData = mutation({
       "factoryCostItems",
       "factories",
       "shippingCompanies",
+      "costSettings",
     ]
 
     let totalDeleted = 0

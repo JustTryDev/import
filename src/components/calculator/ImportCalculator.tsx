@@ -14,6 +14,7 @@ import {
   useAllFactoryCostItems,
   useAutoSeed,
   useFactoryPresets,
+  useCostSettings,
 } from "@/hooks"
 import {
   calculateImportCost,
@@ -87,6 +88,9 @@ export function ImportCalculator() {
   // ===== 중국 공장 =====
   const { factories, isLoading: factoriesLoading } = useFactories()
   const { costItemsMap: factoryCostItemsMap, isLoading: factoryCostItemsLoading } = useAllFactoryCostItems()
+
+  // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL) =====
+  const { inlandConfig, domesticConfig, threePLConfig } = useCostSettings()
 
   // 부대 비용 슬롯 (기본 2개)
   const [factorySlots, setFactorySlots] = useState<FactorySlot[]>(() => createEmptySlots(2))
@@ -305,6 +309,12 @@ export function ImportCalculator() {
       shippingRates: rateTable,
       companyCosts,
       orderCount,
+      // 비용 설정 (DB에서 가져온 값)
+      costSettings: {
+        inland: inlandConfig,
+        domestic: domesticConfig,
+        threePL: threePLConfig,
+      },
     })
   }, [
     unitPrice,
@@ -323,6 +333,9 @@ export function ImportCalculator() {
     companyCostItems,
     shippingRates,
     orderCount,
+    inlandConfig,
+    domesticConfig,
+    threePLConfig,
   ])
 
   // 설정 모달 열기

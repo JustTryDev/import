@@ -1,0 +1,409 @@
+"use client"
+
+/**
+ * 비용 설정 관리 컴포넌트
+ *
+ * 📌 설정 모달 내에서 비용 계산 기준을 관리합니다.
+ * - 내륙 운송료 (CBM당 USD)
+ * - 국내 운송료 (기본료 + 추가 요금)
+ * - 3PL + 배송비 (CBM 단위당 요금)
+ */
+import { useState } from "react"
+import { Truck, Package, MapPin, Save, RotateCcw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useCostSettings } from "@/hooks"
+import type {
+  InlandConfig,
+  DomesticConfig,
+  ThreePLConfig,
+} from "@/hooks/useCostSettings"
+
+export function CostSettingsManager() {
+  const {
+    settings,
+    isLoading,
+    inlandSetting,
+    domesticSetting,
+    threePLSetting,
+    inlandConfig,
+    domesticConfig,
+    threePLConfig,
+    updateSetting,
+    seedDefaults,
+  } = useCostSettings()
+
+  // 편집 상태 (로컬)
+  const [editInland, setEditInland] = useState<InlandConfig | null>(null)
+  const [editDomestic, setEditDomestic] = useState<DomesticConfig | null>(null)
+  const [editThreePL, setEditThreePL] = useState<ThreePLConfig | null>(null)
+
+  // 저장 중 상태
+  const [isSaving, setIsSaving] = useState(false)
+
+  // 내륙 운송료 저장
+  const handleSaveInland = async () => {
+    if (!inlandSetting || !editInland) return
+    setIsSaving(true)
+    try {
+      await updateSetting({
+        id: inlandSetting._id,
+        config: editInland,
+      })
+      setEditInland(null)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 국내 운송료 저장
+  const handleSaveDomestic = async () => {
+    if (!domesticSetting || !editDomestic) return
+    setIsSaving(true)
+    try {
+      await updateSetting({
+        id: domesticSetting._id,
+        config: editDomestic,
+      })
+      setEditDomestic(null)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 3PL 비용 저장
+  const handleSaveThreePL = async () => {
+    if (!threePLSetting || !editThreePL) return
+    setIsSaving(true)
+    try {
+      await updateSetting({
+        id: threePLSetting._id,
+        config: editThreePL,
+      })
+      setEditThreePL(null)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 기본값 생성
+  const handleSeedDefaults = async () => {
+    setIsSaving(true)
+    try {
+      await seedDefaults({})
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 숫자 입력 핸들러 (쉼표 제거 후 숫자 반환)
+  const handleNumberInput = (value: string): number => {
+    const cleaned = value.replace(/[^0-9.]/g, "")
+    return cleaned === "" ? 0 : Number(cleaned)
+  }
+
+  // 숫자 표시 포맷 (천 단위 쉼표)
+  const formatNumber = (value: number): string => {
+    if (value === 0) return ""
+    return value.toLocaleString("ko-KR")
+  }
+
+  // 소수점 포함 숫자 표시 (CBM 단위 등)
+  const formatDecimal = (value: number): string => {
+    if (value === 0) return ""
+    return value.toString()
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-gray-500">로딩 중...</div>
+      </div>
+    )
+  }
+
+  // 설정이 없으면 기본 데이터 생성 안내
+  if (!settings || settings.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800 mb-3">
+            비용 설정이 없습니다. 기본 데이터를 생성해주세요.
+          </p>
+          <Button
+            onClick={handleSeedDefaults}
+            disabled={isSaving}
+            size="sm"
+            className="bg-yellow-600 hover:bg-yellow-700"
+          >
+            <RotateCcw className={`h-4 w-4 mr-2 ${isSaving ? "animate-spin" : ""}`} />
+            기본 데이터 생성
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 안내 문구 */}
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          비용 계산에 사용되는 요금 기준을 설정합니다. 변경 시 즉시 계산에 반영됩니다.
+        </p>
+      </div>
+
+      {/* 1. 내륙 운송료 */}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <MapPin className="h-5 w-5 text-orange-500" />
+          <h4 className="font-medium text-gray-800">내륙 운송료</h4>
+          <span className="text-xs text-gray-400">중국 공장 → 항구</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs text-gray-500">CBM당 단가 (USD)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-gray-400">$</span>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={editInland?.ratePerCbm ?? inlandConfig.ratePerCbm}
+                onChange={(e) =>
+                  setEditInland({
+                    ...inlandConfig,
+                    ...editInland,
+                    ratePerCbm: handleNumberInput(e.target.value),
+                  })
+                }
+                className="h-9"
+              />
+              <span className="text-xs text-gray-400">/CBM</span>
+            </div>
+          </div>
+          <div className="flex items-end">
+            {editInland && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleSaveInland}
+                  disabled={isSaving}
+                  className="h-9"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  저장
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditInland(null)}
+                  className="h-9"
+                >
+                  취소
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          예: 1CBM 물건의 내륙 운송료 = ${inlandConfig.ratePerCbm}
+        </p>
+      </div>
+
+      {/* 2. 국내 운송료 */}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <Truck className="h-5 w-5 text-blue-500" />
+          <h4 className="font-medium text-gray-800">국내 운송료</h4>
+          <span className="text-xs text-gray-400">항구 → 창고</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* 기본료 */}
+          <div>
+            <Label className="text-xs text-gray-500">기본료 (원)</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={formatNumber(editDomestic?.baseFee ?? domesticConfig.baseFee)}
+              onChange={(e) =>
+                setEditDomestic({
+                  ...domesticConfig,
+                  ...editDomestic,
+                  baseFee: handleNumberInput(e.target.value),
+                })
+              }
+              className="h-9 mt-1"
+            />
+          </div>
+          {/* 기본 CBM */}
+          <div>
+            <Label className="text-xs text-gray-500">기본 CBM (이하 기본료만)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={editDomestic?.baseCbm ?? domesticConfig.baseCbm}
+              onChange={(e) =>
+                setEditDomestic({
+                  ...domesticConfig,
+                  ...editDomestic,
+                  baseCbm: handleNumberInput(e.target.value),
+                })
+              }
+              className="h-9 mt-1"
+            />
+          </div>
+          {/* 추가 단위 */}
+          <div>
+            <Label className="text-xs text-gray-500">추가 단위 (CBM)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={editDomestic?.extraUnit ?? domesticConfig.extraUnit}
+              onChange={(e) =>
+                setEditDomestic({
+                  ...domesticConfig,
+                  ...editDomestic,
+                  extraUnit: handleNumberInput(e.target.value),
+                })
+              }
+              className="h-9 mt-1"
+            />
+          </div>
+          {/* 추가 요금 */}
+          <div>
+            <Label className="text-xs text-gray-500">추가 요금 (원/단위)</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={formatNumber(editDomestic?.extraRate ?? domesticConfig.extraRate)}
+              onChange={(e) =>
+                setEditDomestic({
+                  ...domesticConfig,
+                  ...editDomestic,
+                  extraRate: handleNumberInput(e.target.value),
+                })
+              }
+              className="h-9 mt-1"
+            />
+          </div>
+        </div>
+
+        {editDomestic && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={handleSaveDomestic}
+              disabled={isSaving}
+              className="h-9"
+            >
+              <Save className="h-4 w-4 mr-1" />
+              저장
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditDomestic(null)}
+              className="h-9"
+            >
+              취소
+            </Button>
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-2">
+          예: 1CBM 물건 = {domesticConfig.baseFee.toLocaleString()}원 (기본료) +{" "}
+          {(Math.ceil((1 - domesticConfig.baseCbm) / domesticConfig.extraUnit) *
+            domesticConfig.extraRate).toLocaleString()}
+          원 (추가) ={" "}
+          {(
+            domesticConfig.baseFee +
+            Math.ceil((1 - domesticConfig.baseCbm) / domesticConfig.extraUnit) *
+              domesticConfig.extraRate
+          ).toLocaleString()}
+          원
+        </p>
+      </div>
+
+      {/* 3. 3PL + 배송비 */}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <Package className="h-5 w-5 text-green-500" />
+          <h4 className="font-medium text-gray-800">3PL + 배송비</h4>
+          <span className="text-xs text-gray-400">물류대행 및 최종 배송</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* 단위당 요금 */}
+          <div>
+            <Label className="text-xs text-gray-500">단위당 요금 (원)</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={formatNumber(editThreePL?.ratePerUnit ?? threePLConfig.ratePerUnit)}
+              onChange={(e) =>
+                setEditThreePL({
+                  ...threePLConfig,
+                  ...editThreePL,
+                  ratePerUnit: handleNumberInput(e.target.value),
+                })
+              }
+              className="h-9 mt-1"
+            />
+          </div>
+          {/* 단위 */}
+          <div>
+            <Label className="text-xs text-gray-500">단위 (CBM)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={editThreePL?.unit ?? threePLConfig.unit}
+              onChange={(e) =>
+                setEditThreePL({
+                  ...threePLConfig,
+                  ...editThreePL,
+                  unit: handleNumberInput(e.target.value),
+                })
+              }
+              className="h-9 mt-1"
+            />
+          </div>
+        </div>
+
+        {editThreePL && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={handleSaveThreePL}
+              disabled={isSaving}
+              className="h-9"
+            >
+              <Save className="h-4 w-4 mr-1" />
+              저장
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditThreePL(null)}
+              className="h-9"
+            >
+              취소
+            </Button>
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-2">
+          예: 1CBM 물건 = {threePLConfig.unit}CBM 단위로 올림 →{" "}
+          {Math.ceil(1 / threePLConfig.unit)}단위 ×{" "}
+          {threePLConfig.ratePerUnit.toLocaleString()}원 ={" "}
+          {(
+            Math.ceil(1 / threePLConfig.unit) * threePLConfig.ratePerUnit
+          ).toLocaleString()}
+          원
+        </p>
+      </div>
+    </div>
+  )
+}

@@ -63,6 +63,7 @@ export interface CalculateImportCostParams {
   dimensions: ProductDimensions  // 제품 크기 (cm)
   exchangeRate: number           // 환율 (1 외화 = ? 원)
   usdRate: number                // USD 환율 (내륙운송료 환산용)
+  cnyRate?: number               // CNY 환율 (국제운송료 환산용)
 
   // 관세 (두 가지 모두 전달)
   tariffRate: number             // 실제 적용할 관세율 (%)
@@ -74,6 +75,7 @@ export interface CalculateImportCostParams {
 
   // 국제 운송료 테이블
   shippingRates: ShippingRateTable[]
+  rateTypeCurrency?: "USD" | "CNY" | "KRW"  // 운임 타입 통화 (기본값: USD)
 
   // 업체별 공통 비용
   companyCosts: CostItemInput[]
@@ -97,11 +99,13 @@ export function calculateImportCost(
     dimensions,
     exchangeRate,
     usdRate,
+    cnyRate = 0,
     tariffRate,
     basicTariffRate,
     ftaTariffRate,
     additionalCosts,
     shippingRates,
+    rateTypeCurrency = "USD",
     companyCosts,
     orderCount,
     costSettings,
@@ -158,10 +162,25 @@ export function calculateImportCost(
   // 5. 부가세 계산 (제품가격 + 부대비용 + 내륙운송료) × 10% (관세 제외!)
   const { vatBase, vatAmount } = calculateVat(taxableBase, inlandShippingKRW)
 
-  // 6. 국제 운송료
+  // 6. 국제 운송료 (통화별 환율 적용)
   const shippingResult = findShippingRate(shippingRates, totalCbm)
-  const internationalShippingUSD = shippingResult?.rateUSD ?? 0
-  const internationalShippingKRW = shippingResult?.rateKRW ?? 0
+  const internationalShippingRate = shippingResult?.rate ?? 0
+
+  // 통화별 환율 적용하여 원화 계산
+  let internationalShippingKRW: number
+  let internationalShippingForeign: number = internationalShippingRate  // 외화 금액
+  if (rateTypeCurrency === "KRW") {
+    internationalShippingKRW = internationalShippingRate
+  } else if (rateTypeCurrency === "CNY") {
+    internationalShippingKRW = Math.round(internationalShippingRate * cnyRate)
+  } else {
+    // 기본값 USD
+    internationalShippingKRW = Math.round(internationalShippingRate * usdRate)
+  }
+  // USD 환산값 (비용 내역 표시용)
+  const internationalShippingUSD = rateTypeCurrency === "USD"
+    ? internationalShippingRate
+    : (rateTypeCurrency === "KRW" ? internationalShippingRate / usdRate : internationalShippingRate * cnyRate / usdRate)
 
   // 7. 국내 운송료
   const domesticShippingKRW = calculateDomesticShipping(totalCbm, costSettings?.domestic)

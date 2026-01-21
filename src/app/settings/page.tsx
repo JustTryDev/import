@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
+import { motion } from "framer-motion"
 import { ArrowLeft, Building2, Truck, DollarSign, Factory } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,10 +34,39 @@ function SettingsContent() {
     }
   }, [searchParams])
 
+  // 애니메이션 설정
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.1,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 16 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.4,
+        ease: [0.25, 0.1, 0.25, 1],
+      },
+    },
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 px-4 py-4">
+      <motion.header
+        className="bg-white border-b border-gray-200 px-4 py-4"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      >
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-4">
             <Link href="/">
@@ -53,19 +83,24 @@ function SettingsContent() {
             </div>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       {/* 메인 컨텐츠 */}
-      <main className="max-w-5xl mx-auto p-4">
+      <motion.main
+        className="max-w-5xl mx-auto p-4"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {/* 초기 데이터 시드 버튼 */}
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <motion.div variants={itemVariants} className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-yellow-800">
                 처음 사용 시 기본 데이터를 생성해주세요
               </p>
               <p className="text-xs text-yellow-600 mt-1">
-                Gofort 업체 및 운임 테이블이 자동으로 추가됩니다
+                고포트 업체 및 운임 테이블이 자동으로 추가됩니다
               </p>
             </div>
             <Button
@@ -77,10 +112,11 @@ function SettingsContent() {
               {isSeeding ? "생성 중..." : "기본 데이터 생성"}
             </Button>
           </div>
-        </div>
+        </motion.div>
 
         {/* 탭 네비게이션 */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <motion.div variants={itemVariants}>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-4 w-full mb-6">
             <TabsTrigger value="companies" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
@@ -120,7 +156,8 @@ function SettingsContent() {
             <FactoryManager />
           </TabsContent>
         </Tabs>
-      </main>
+        </motion.div>
+      </motion.main>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -283,9 +284,30 @@ export function ProductCard({
         )}
       </div>
 
-      {/* 본문 (접기/펼치기) */}
-      {isExpanded && (
-        <div className="p-3 space-y-3">
+      {/* 본문 (접기/펼치기 애니메이션) */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{
+              height: "auto",
+              opacity: 1,
+              transition: {
+                height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+                opacity: { duration: 0.2, delay: 0.05 },
+              },
+            }}
+            exit={{
+              height: 0,
+              opacity: 0,
+              transition: {
+                height: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                opacity: { duration: 0.1 },
+              },
+            }}
+            style={{ overflow: "hidden" }}
+          >
+            <div className="p-3 space-y-3">
           {/* HS Code 검색 */}
           <div data-product-search={product.id}>
             {product.hsCode ? (
@@ -462,12 +484,12 @@ export function ProductCard({
             </div>
           </div>
 
-          {/* 크기 + CBM (2열) */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* 크기 입력 */}
-            <div>
+          {/* 크기 + R.TON (2:1 비율) */}
+          <div className="grid grid-cols-3 gap-3">
+            {/* 크기 입력 (2칸 차지) */}
+            <div className="col-span-2">
               <Label className="text-xs text-gray-500">크기 (cm)</Label>
-              <div className="flex items-center gap-1 mt-1">
+              <div className="flex items-center gap-2 mt-1">
                 <NumberInput
                   value={product.dimensions.width}
                   onChange={(v) => handleDimensionChange("width", v)}
@@ -477,9 +499,9 @@ export function ProductCard({
                   decimal={0}
                   placeholder="가로"
                   align="center"
-                  size="sm"
+                  className="h-10"
                 />
-                <span className="text-gray-400 text-xs">×</span>
+                <span className="text-gray-400">×</span>
                 <NumberInput
                   value={product.dimensions.height}
                   onChange={(v) => handleDimensionChange("height", v)}
@@ -489,9 +511,9 @@ export function ProductCard({
                   decimal={0}
                   placeholder="세로"
                   align="center"
-                  size="sm"
+                  className="h-10"
                 />
-                <span className="text-gray-400 text-xs">×</span>
+                <span className="text-gray-400">×</span>
                 <NumberInput
                   value={product.dimensions.depth}
                   onChange={(v) => handleDimensionChange("depth", v)}
@@ -501,12 +523,12 @@ export function ProductCard({
                   decimal={0}
                   placeholder="높이"
                   align="center"
-                  size="sm"
+                  className="h-10"
                 />
               </div>
             </div>
 
-            {/* R.TON (CBM) 표시 */}
+            {/* R.TON (CBM) 표시 (1칸 차지) */}
             <div>
               <Label className="text-xs text-gray-500">R.TON (CBM)</Label>
               <div className="mt-1 px-2 py-1.5 bg-gray-50 rounded text-sm">
@@ -530,18 +552,18 @@ export function ProductCard({
             </div>
           </div>
 
-          {/* 관세율 */}
+          {/* 관세율 + 입력 완료 (같은 행) */}
           <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            {/* FTA 적용 토글 (왼쪽으로 이동) */}
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={product.useFta}
-                onCheckedChange={handleFtaToggle}
-              />
-              <span className="text-xs text-gray-500">FTA 적용</span>
-            </div>
-
-            <div className="flex items-center gap-3">
+            {/* 좌측: FTA 적용 토글 + 기본% + FTA% */}
+            <div className="flex items-center gap-4">
+              {/* FTA 적용 토글 */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={product.useFta}
+                  onCheckedChange={handleFtaToggle}
+                />
+                <span className="text-xs text-gray-500">FTA 적용</span>
+              </div>
               {/* 기본 관세율 */}
               <div className="flex items-center gap-1">
                 <span className="text-xs text-gray-500">기본</span>
@@ -575,25 +597,11 @@ export function ProductCard({
                 <span className="text-xs text-gray-500">%</span>
               </div>
             </div>
-          </div>
 
-          {/* 적용 관세율 및 개당 수입원가 + 입력 완료 버튼 */}
-          <div className="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500">
-                적용 관세율: <span className="font-medium text-gray-700">{appliedRate}%</span>
-              </span>
-              {unitCost !== null && (
-                <span className="text-sm font-bold text-primary">
-                  개당 {unitCost.toLocaleString()}원
-                </span>
-              )}
-            </div>
-            {/* 입력 완료 버튼 */}
+            {/* 우측: 입력 완료 버튼 */}
             <Button
-              variant="outline"
               size="sm"
-              className="h-7 text-xs gap-1"
+              className="h-7 text-xs gap-1 bg-gray-900 text-white hover:bg-gray-800"
               onClick={(e) => {
                 e.stopPropagation()
                 setIsExpanded(false)
@@ -603,8 +611,10 @@ export function ProductCard({
               입력 완료
             </Button>
           </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

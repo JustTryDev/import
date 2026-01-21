@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { motion } from "framer-motion"
 import { Id } from "../../../convex/_generated/dataModel"
 import {
   Product,
@@ -203,14 +204,20 @@ export function ImportCalculator() {
       return null
     }
 
-    // 운송료 테이블 변환
+    // 운송료 테이블 변환 (기존 데이터 호환성 처리)
     const rateTable: ShippingRateTable[] = shippingRates
       ? shippingRates.map((r) => ({
           cbm: r.cbm,
-          rateUSD: r.rateUSD,
-          rateKRW: r.rateKRW,
+          // 기존 데이터(rateUSD)와 새 데이터(rate) 호환성 처리
+          rate: (r as { rate?: number; rateUSD?: number }).rate
+            ?? (r as { rate?: number; rateUSD?: number }).rateUSD
+            ?? 0,
         }))
       : []
+
+    // 선택된 운임 타입의 통화 가져오기
+    const selectedRateType = rateTypes?.find((rt) => rt._id === selectedRateTypeId)
+    const rateTypeCurrency = (selectedRateType?.currency ?? "USD") as "USD" | "CNY" | "KRW"
 
     // 공장 슬롯 변환 (다중 제품용)
     // 📌 현재는 linkedProductIds가 없으므로 모든 제품에 연결
@@ -270,6 +277,7 @@ export function ImportCalculator() {
       },
       factorySlots: factorySlotInputs,
       shippingRates: rateTable,
+      rateTypeCurrency,
       companyCosts,
       orderCount,
       costSettings: {
@@ -288,6 +296,8 @@ export function ImportCalculator() {
     selectedCompanyCostIds,
     companyCostItems,
     shippingRates,
+    rateTypes,
+    selectedRateTypeId,
     orderCount,
     inlandConfig,
     domesticConfig,
@@ -350,34 +360,71 @@ export function ImportCalculator() {
   // 총 수량 계산 (결과 표시용)
   const totalQuantity = products.reduce((sum, p) => sum + p.quantity, 0)
 
+  // 애니메이션 설정 (토스 스타일의 부드러운 효과)
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.1,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 16 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.4,
+        ease: [0.25, 0.1, 0.25, 1],
+      },
+    },
+  }
+
   return (
     <div className="h-screen bg-gray-50">
       {/* 메인 컨텐츠 - 좌우 2단 레이아웃 (50:50) */}
       <main className="h-full px-4 py-3 overflow-hidden">
         <div className="h-full grid grid-cols-2 gap-6">
           {/* 좌측: 입력 영역 */}
-          <div className="space-y-3 overflow-y-auto pr-2">
+          <motion.div
+            className="space-y-3 overflow-y-auto pr-2"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {/* 1. 오늘의 환율 (표시 전용, 통화 선택은 제품 카드에서) */}
-            <ExchangeRateDisplay
-              usdRate={usdRate}
-              cnyRate={cnyRate}
-              updatedAt={updatedAt}
-              history={rateHistory}
-              onRefresh={refetchRates}
-              isLoading={rateLoading}
-            />
+            <motion.div variants={itemVariants}>
+              <ExchangeRateDisplay
+                usdRate={usdRate}
+                cnyRate={cnyRate}
+                updatedAt={updatedAt}
+                history={rateHistory}
+                onRefresh={refetchRates}
+                isLoading={rateLoading}
+              />
+            </motion.div>
 
             {/* 2. 제품 목록 (다중 제품 입력) */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <motion.div
+              variants={itemVariants}
+              className="bg-white rounded-lg border border-gray-200 p-3"
+            >
               <ProductList
                 products={products}
                 setProducts={setProducts}
                 productResults={calculationResult?.products}
               />
-            </div>
+            </motion.div>
 
             {/* 3. 중국 공장 추가 비용 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <motion.div
+              variants={itemVariants}
+              className="bg-white rounded-lg border border-gray-200 p-3"
+            >
               <AdditionalCostInput
                 slots={factorySlots}
                 setSlots={setFactorySlots}
@@ -393,10 +440,10 @@ export function ImportCalculator() {
                 onSavePreset={() => setPresetDialogOpen(true)}
                 products={products}
               />
-            </div>
+            </motion.div>
 
             {/* 4. [국제 운송 회사] [업체별 공통 비용] - 2열 그리드 */}
-            <div className="grid grid-cols-2 gap-3">
+            <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-lg border border-gray-200 p-3">
                 <ShippingCompanySelector
                   companies={companies}
@@ -419,11 +466,16 @@ export function ImportCalculator() {
                   isLoading={companyCostsLoading}
                 />
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* 우측: 결과 영역 */}
-          <div className="space-y-3 overflow-y-auto">
+          <motion.div
+            className="space-y-3 overflow-y-auto"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          >
             {/* 비용 상세 내역 (다중 제품용) */}
             <MultiProductCostBreakdown
               result={calculationResult}
@@ -438,7 +490,7 @@ export function ImportCalculator() {
               }}
               orderCount={orderCount}
             />
-          </div>
+          </motion.div>
         </div>
       </main>
 

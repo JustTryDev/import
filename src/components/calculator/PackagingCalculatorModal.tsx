@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { X, Truck } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { NumberInput } from "@/components/ui/number-input"
 import {
@@ -12,7 +13,24 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { calculateRTon, calculateWeightTon } from "@/lib/calculations"
+import {
+  calculateRTon,
+  calculateWeightTon,
+  roundCbmToHalf,
+  findShippingRate,
+  calculateInlandShipping,
+  calculateDomesticShipping,
+  calculate3PLCost,
+} from "@/lib/calculations"
+import {
+  useShippingCompanies,
+  useShippingRateTypes,
+  useShippingRates,
+  useCostSettings,
+  useExchangeRate,
+} from "@/hooks"
+import { Id } from "../../../convex/_generated/dataModel"
+import { formatNumberWithCommas } from "@/lib/format"
 
 interface PackagingCalculatorModalProps {
   isOpen: boolean
@@ -64,6 +82,51 @@ export function PackagingCalculatorModal({
   const [totalWeight, setTotalWeight] = useState(0)
   const [totalWeightUnit, setTotalWeightUnit] = useState<ExtendedWeightUnit>("kg")
 
+  // ===== 운송 업체 관련 상태 =====
+  const { companies } = useShippingCompanies()
+  const [selectedCompanyId, setSelectedCompanyId] = useState<Id<"shippingCompanies"> | null>(null)
+
+  // 운임 타입
+  const { rateTypes, defaultRateType } = useShippingRateTypes(selectedCompanyId)
+  const [selectedRateTypeId, setSelectedRateTypeId] = useState<Id<"shippingRateTypes"> | null>(null)
+
+  // 운송료 테이블
+  const { rates: shippingRates, isLoading: shippingRatesLoading } = useShippingRates(selectedRateTypeId)
+
+  // 선택된 운임 타입 정보 (통화)
+  const selectedRateType = rateTypes?.find(rt => rt._id === selectedRateTypeId)
+  const rateTypeCurrency = selectedRateType?.currency ?? "USD"
+
+  // 비용 설정 (내륙운송료, 국내운송료, 3PL)
+  const { inlandConfig, domesticConfig, threePLConfig } = useCostSettings()
+
+  // 환율
+  const { rates: exchangeRates } = useExchangeRate()
+  const usdRate = exchangeRates?.USD?.baseRate ?? 1400
+  const cnyRate = exchangeRates?.CNY?.baseRate ?? 190
+
+  // 첫 번째 업체 자동 선택
+  useEffect(() => {
+    if (companies && companies.length > 0 && !selectedCompanyId) {
+      setSelectedCompanyId(companies[0]._id)
+    }
+  }, [companies, selectedCompanyId])
+
+  // 기본 운임 타입 자동 선택
+  useEffect(() => {
+    if (defaultRateType && !selectedRateTypeId) {
+      setSelectedRateTypeId(defaultRateType._id)
+    } else if (rateTypes && rateTypes.length > 0 && !selectedRateTypeId) {
+      setSelectedRateTypeId(rateTypes[0]._id)
+    }
+  }, [rateTypes, defaultRateType, selectedRateTypeId])
+
+  // 업체 변경 시 운임 타입 초기화
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId as Id<"shippingCompanies">)
+    setSelectedRateTypeId(null)
+  }
+
   // 계산 결과
   const [result, setResult] = useState<{
     cbm: number
@@ -71,59 +134,123 @@ export function PackagingCalculatorModal({
     weightTon: number
     measurementTon: number
     rTon: number
+    roundedRTon: number
     isWeightBased: boolean
+    // 예상 배송비
+    inlandShipping: number           // 중국 내륙 운송료 (KRW)
+    inlandShippingUSD: number        // 중국 내륙 운송료 (USD)
+    internationalShipping: number    // 국제 운송료 (KRW)
+    internationalShippingForeign: number  // 국제 운송료 (외화)
+    internationalShippingCurrency: string // 국제 운송료 통화
+    domesticShipping: number
+    threePLCost: number
+    totalShippingCost: number
   } | null>(null)
 
   // 계산 로직
   useEffect(() => {
+    let cbm = 0
+    let weightKg = 0
+
     if (inputMode === "per_box") {
       // 포장 별 입력 계산
       if (boxWidth > 0 && boxHeight > 0 && boxDepth > 0 && boxQuantity > 0) {
-        // CBM 계산: (가로 × 세로 × 높이) / 1,000,000 × 수량
         const unitCbm = (boxWidth * boxHeight * boxDepth) / 1_000_000
-        const cbm = unitCbm * boxQuantity
-
-        // 중량 계산 (kg) - 무게 미입력 시 0
+        cbm = unitCbm * boxQuantity
         const unitWeightKg = boxWeight > 0 ? convertToKgExtended(boxWeight, boxWeightUnit) : 0
-        const weightKg = unitWeightKg * boxQuantity
-
-        // W/T, M/T, R.TON 계산
-        // 무게 미입력 시 W/T = 0, R.TON = CBM
-        const weightTon = calculateWeightTon(weightKg)
-        const measurementTon = cbm
-        const rTon = calculateRTon(weightTon, measurementTon)
-
-        setResult({
-          cbm,
-          weightKg,
-          weightTon,
-          measurementTon,
-          rTon,
-          isWeightBased: weightTon > measurementTon,
-        })
+        weightKg = unitWeightKg * boxQuantity
       } else {
         setResult(null)
+        return
       }
     } else {
       // 총 부피 & 중량 입력 계산
       if (totalCbm > 0 || totalWeight > 0) {
-        const weightKg = convertToKgExtended(totalWeight, totalWeightUnit)
-        const weightTon = calculateWeightTon(weightKg)
-        const measurementTon = totalCbm
-        const rTon = calculateRTon(weightTon, measurementTon)
-
-        setResult({
-          cbm: totalCbm,
-          weightKg,
-          weightTon,
-          measurementTon,
-          rTon,
-          isWeightBased: weightTon > measurementTon,
-        })
+        cbm = totalCbm
+        weightKg = convertToKgExtended(totalWeight, totalWeightUnit)
       } else {
         setResult(null)
+        return
       }
     }
+
+    // W/T, M/T, R.TON 계산
+    const weightTon = calculateWeightTon(weightKg)
+    const measurementTon = cbm
+    const rTon = calculateRTon(weightTon, measurementTon)
+
+    // ===== 예상 배송비 계산 =====
+
+    // 1. 중국 내륙 운송료 (USD → KRW)
+    const inlandShippingUSDValue = calculateInlandShipping(rTon, inlandConfig ?? undefined)
+    const inlandShipping = Math.round(inlandShippingUSDValue * usdRate)
+
+    // 2. 국제 운송료 (운임 테이블 기반)
+    let internationalShipping = 0
+    let internationalShippingForeign = 0
+    let roundedRTon = roundCbmToHalf(rTon) // 기본값: 0.5 올림
+
+    if (shippingRates && shippingRates.length > 0) {
+      // 기존 데이터(rateUSD)와 새 데이터(rate) 호환성 처리
+      const validRates = shippingRates
+        .filter(r => r.cbm !== undefined)
+        .map(r => {
+          const rateValue = (r as { rate?: number; rateUSD?: number }).rate
+            ?? (r as { rate?: number; rateUSD?: number }).rateUSD
+            ?? 0
+          return { cbm: r.cbm, rate: rateValue }
+        })
+        .filter(r => r.rate > 0)
+
+      if (validRates.length > 0) {
+        const shippingResult = findShippingRate(validRates, rTon)
+        if (shippingResult && !isNaN(shippingResult.rate)) {
+          // 운임 테이블에서 매칭된 CBM이 적용값
+          roundedRTon = shippingResult.cbm
+          internationalShippingForeign = shippingResult.rate
+
+          // 통화별 환율 적용
+          if (rateTypeCurrency === "KRW") {
+            internationalShipping = shippingResult.rate
+          } else if (rateTypeCurrency === "CNY") {
+            internationalShipping = Math.round(shippingResult.rate * cnyRate)
+          } else {
+            internationalShipping = Math.round(shippingResult.rate * usdRate)
+          }
+        }
+      }
+    }
+
+    // 3. 국내 운송료
+    const domesticShipping = calculateDomesticShipping(rTon, domesticConfig ?? undefined)
+
+    // 4. 3PL 비용 + 배송비
+    const threePLCost = calculate3PLCost(rTon, threePLConfig ?? undefined)
+
+    // 총 예상 배송비 (NaN 방지)
+    const safeInland = isNaN(inlandShipping) ? 0 : inlandShipping
+    const safeInternational = isNaN(internationalShipping) ? 0 : internationalShipping
+    const safeDomestic = isNaN(domesticShipping) ? 0 : domesticShipping
+    const safeThreePL = isNaN(threePLCost) ? 0 : threePLCost
+    const totalShippingCost = safeInland + safeInternational + safeDomestic + safeThreePL
+
+    setResult({
+      cbm,
+      weightKg,
+      weightTon,
+      measurementTon,
+      rTon,
+      roundedRTon,
+      isWeightBased: weightTon > measurementTon,
+      inlandShipping: safeInland,
+      inlandShippingUSD: inlandShippingUSDValue,
+      internationalShipping: safeInternational,
+      internationalShippingForeign,
+      internationalShippingCurrency: rateTypeCurrency,
+      domesticShipping: safeDomestic,
+      threePLCost: safeThreePL,
+      totalShippingCost,
+    })
   }, [
     inputMode,
     boxWidth,
@@ -135,6 +262,13 @@ export function PackagingCalculatorModal({
     totalCbm,
     totalWeight,
     totalWeightUnit,
+    shippingRates,
+    rateTypeCurrency,
+    usdRate,
+    cnyRate,
+    inlandConfig,
+    domesticConfig,
+    threePLConfig,
   ])
 
   // 모달 닫힐 때 상태 초기화
@@ -142,18 +276,28 @@ export function PackagingCalculatorModal({
     onClose()
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* 배경 오버레이 */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={handleClose}
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* 배경 오버레이 (애니메이션) */}
+          <motion.div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+            onClick={handleClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          />
 
-      {/* 모달 컨텐츠 */}
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+          {/* 모달 컨텐츠 (애니메이션) */}
+          <motion.div
+            className="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] overflow-y-auto"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+          >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">패키징 계산</h2>
@@ -168,9 +312,9 @@ export function PackagingCalculatorModal({
 
         {/* 본문 */}
         <div className="p-4 space-y-4">
-          {/* 입력 모드 선택 */}
+          {/* 입력 모드 선택 (애니메이션 적용) */}
           <div className="flex gap-2">
-            <button
+            <motion.button
               type="button"
               onClick={() => setInputMode("per_box")}
               className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
@@ -178,10 +322,11 @@ export function PackagingCalculatorModal({
                   ? "bg-gray-900 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
+              whileTap={{ scale: 0.98 }}
             >
               포장 별 입력
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               type="button"
               onClick={() => setInputMode("total")}
               className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
@@ -189,14 +334,23 @@ export function PackagingCalculatorModal({
                   ? "bg-gray-900 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
+              whileTap={{ scale: 0.98 }}
             >
               총 부피 & 중량 입력
-            </button>
+            </motion.button>
           </div>
 
-          {/* 포장 별 입력 */}
-          {inputMode === "per_box" && (
-            <div className="space-y-3">
+          {/* 포장 별 입력 (애니메이션 적용) */}
+          <AnimatePresence mode="wait">
+            {inputMode === "per_box" && (
+              <motion.div
+                key="per_box"
+                className="space-y-3"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.2 }}
+              >
               {/* 박스 크기 */}
               <div>
                 <Label className="text-xs text-gray-500">박스 크기 (cm)</Label>
@@ -281,12 +435,20 @@ export function PackagingCalculatorModal({
                   </Select>
                 </div>
               </div>
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          {/* 총 부피 & 중량 입력 (1행 3열: 부피, 중량 동일 너비 + 단위) */}
-          {inputMode === "total" && (
-            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr 80px' }}>
+            {/* 총 부피 & 중량 입력 (애니메이션 적용) */}
+            {inputMode === "total" && (
+              <motion.div
+                key="total"
+                className="grid gap-2"
+                style={{ gridTemplateColumns: '1fr 1fr 80px' }}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+              >
               <div>
                 <Label className="text-xs text-gray-500">총 부피 (CBM)</Label>
                 <NumberInput
@@ -329,8 +491,50 @@ export function PackagingCalculatorModal({
                   </SelectContent>
                 </Select>
               </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 운송 업체 / 운임 타입 선택 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-gray-500">운송 업체</Label>
+              <Select
+                value={selectedCompanyId ?? undefined}
+                onValueChange={handleCompanyChange}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="업체 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies?.map((company) => (
+                    <SelectItem key={company._id} value={company._id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+            <div>
+              <Label className="text-xs text-gray-500">운임 타입</Label>
+              <Select
+                value={selectedRateTypeId ?? undefined}
+                onValueChange={(v) => setSelectedRateTypeId(v as Id<"shippingRateTypes">)}
+                disabled={!selectedCompanyId || !rateTypes?.length}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="운임 타입 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rateTypes?.map((type) => (
+                    <SelectItem key={type._id} value={type._id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* 계산 결과 */}
           {result && (
@@ -341,9 +545,15 @@ export function PackagingCalculatorModal({
                 <div className="text-3xl font-bold text-primary mt-1">
                   {result.rTon.toFixed(2)}
                 </div>
-                <span className="text-xs text-gray-400">
-                  {result.isWeightBased ? "중량 기준" : "부피 기준"}
-                </span>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <span className="text-xs text-gray-400">
+                    {result.isWeightBased ? "중량 기준" : "부피 기준"}
+                  </span>
+                  <span className="text-xs text-gray-300">|</span>
+                  <span className="text-xs text-gray-500">
+                    적용: <span className="font-medium">{result.roundedRTon.toFixed(1)}</span>
+                  </span>
+                </div>
               </div>
 
               {/* 상세 정보 */}
@@ -369,6 +579,53 @@ export function PackagingCalculatorModal({
                   </span>
                 </div>
               </div>
+
+              {/* 예상 배송비 */}
+              <div className="border-t border-gray-200 pt-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">예상 배송비</span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">중국 내륙 운송료</span>
+                    <span className="font-mono text-gray-700">
+                      {formatNumberWithCommas(result.inlandShipping)}원
+                      <span className="text-xs text-gray-400 ml-1">(${result.inlandShippingUSD.toFixed(2)})</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">
+                      국제 운송료
+                      {shippingRatesLoading && <span className="text-xs text-gray-400 ml-1">(로딩중...)</span>}
+                      {!shippingRatesLoading && (!shippingRates || shippingRates.length === 0) && (
+                        <span className="text-xs text-orange-500 ml-1">(운임 데이터 없음)</span>
+                      )}
+                    </span>
+                    <span className="font-mono text-gray-700">
+                      {formatNumberWithCommas(result.internationalShipping)}원
+                      {result.internationalShippingCurrency !== "KRW" && result.internationalShippingForeign > 0 && (
+                        <span className="text-xs text-gray-400 ml-1">
+                          ({result.internationalShippingCurrency === "USD" ? "$" : "¥"}
+                          {result.internationalShippingForeign.toFixed(2)})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">국내 운송료</span>
+                    <span className="font-mono text-gray-700">{formatNumberWithCommas(result.domesticShipping)}원</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">3PL 비용 + 배송비</span>
+                    <span className="font-mono text-gray-700">{formatNumberWithCommas(result.threePLCost)}원</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium pt-2 border-t border-gray-200">
+                    <span className="text-gray-700">총 예상 배송비</span>
+                    <span className="font-mono text-primary">{formatNumberWithCommas(result.totalShippingCost)}원</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -382,17 +639,19 @@ export function PackagingCalculatorModal({
           )}
         </div>
 
-        {/* 푸터 */}
-        <div className="px-4 py-3 border-t border-gray-200">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleClose}
-          >
-            닫기
-          </Button>
+          {/* 푸터 */}
+          <div className="px-4 py-3 border-t border-gray-200">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleClose}
+            >
+              닫기
+            </Button>
+          </div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   )
 }

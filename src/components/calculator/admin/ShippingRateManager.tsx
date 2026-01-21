@@ -45,6 +45,7 @@ export function ShippingRateManager() {
   // 새 운임 타입 상태
   const [isAddingType, setIsAddingType] = useState(false)
   const [newTypeName, setNewTypeName] = useState("")
+  const [newTypeCurrency, setNewTypeCurrency] = useState<"USD" | "CNY" | "KRW">("USD")
 
   // 운임 타입 편집 상태
   const [editingTypeId, setEditingTypeId] = useState<Id<"shippingRateTypes"> | null>(null)
@@ -53,8 +54,7 @@ export function ShippingRateManager() {
   // 새 운임 상태
   const [isAddingRate, setIsAddingRate] = useState(false)
   const [newCbm, setNewCbm] = useState("")
-  const [newRateUSD, setNewRateUSD] = useState("")
-  const [newRateKRW, setNewRateKRW] = useState("")
+  const [newRate, setNewRate] = useState("")
 
   // 첫 번째 업체 자동 선택
   useEffect(() => {
@@ -81,10 +81,12 @@ export function ShippingRateManager() {
     await createRateType({
       companyId: selectedCompanyId,
       name: newTypeName.trim(),
+      currency: newTypeCurrency,
       isDefault: false,
       sortOrder: (rateTypes?.length ?? 0) + 1,
     })
     setNewTypeName("")
+    setNewTypeCurrency("USD")
     setIsAddingType(false)
   }
 
@@ -124,19 +126,16 @@ export function ShippingRateManager() {
   const handleAddRate = async () => {
     if (!selectedRateTypeId) return
     const cbm = parseFloat(newCbm)
-    const rateUSD = parseFloat(newRateUSD)
-    const rateKRW = parseInt(newRateKRW, 10)
-    if (isNaN(cbm) || isNaN(rateUSD) || isNaN(rateKRW)) return
+    const rate = parseFloat(newRate)
+    if (isNaN(cbm) || isNaN(rate)) return
 
     await createRate({
       rateTypeId: selectedRateTypeId,
       cbm,
-      rateUSD,
-      rateKRW,
+      rate,
     })
     setNewCbm("")
-    setNewRateUSD("")
-    setNewRateKRW("")
+    setNewRate("")
     setIsAddingRate(false)
   }
 
@@ -195,7 +194,21 @@ export function ShippingRateManager() {
                   placeholder="운임 타입명 (예: 할인운임제)"
                   value={newTypeName}
                   onChange={(e) => setNewTypeName(e.target.value)}
+                  className="flex-1"
                 />
+                <Select
+                  value={newTypeCurrency}
+                  onValueChange={(v) => setNewTypeCurrency(v as "USD" | "CNY" | "KRW")}
+                >
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                    <SelectItem value="CNY">CNY (¥)</SelectItem>
+                    <SelectItem value="KRW">KRW (₩)</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" onClick={handleAddRateType}>
                   추가
                 </Button>
@@ -205,6 +218,7 @@ export function ShippingRateManager() {
                   onClick={() => {
                     setIsAddingType(false)
                     setNewTypeName("")
+                    setNewTypeCurrency("USD")
                   }}
                 >
                   취소
@@ -256,6 +270,10 @@ export function ShippingRateManager() {
                           }`}
                         >
                           {type.name}
+                          {/* 통화 표시 */}
+                          <span className="ml-1 opacity-70">
+                            ({(type as { currency?: string }).currency ?? "USD"})
+                          </span>
                           {type.isDefault && " (기본)"}
                         </button>
                         <button
@@ -274,10 +292,18 @@ export function ShippingRateManager() {
           </div>
 
           {/* 운임 요금표 */}
-          {selectedRateTypeId && (
+          {selectedRateTypeId && (() => {
+            // 선택된 운임 타입의 통화 가져오기
+            const selectedType = rateTypes?.find((t) => t._id === selectedRateTypeId)
+            const currency = (selectedType as { currency?: string })?.currency ?? "USD"
+            const currencySymbol = currency === "USD" ? "$" : currency === "CNY" ? "¥" : "₩"
+
+            return (
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-700">요금표</h3>
+                <h3 className="text-sm font-medium text-gray-700">
+                  요금표 <span className="text-gray-400">({currency})</span>
+                </h3>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -302,7 +328,7 @@ export function ShippingRateManager() {
 
               {/* 새 요금 추가 폼 */}
               {isAddingRate && (
-                <div className="grid grid-cols-4 gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
                   <Input
                     placeholder="CBM"
                     value={newCbm}
@@ -311,15 +337,9 @@ export function ShippingRateManager() {
                     step="0.5"
                   />
                   <Input
-                    placeholder="USD"
-                    value={newRateUSD}
-                    onChange={(e) => setNewRateUSD(e.target.value)}
-                    type="number"
-                  />
-                  <Input
-                    placeholder="KRW"
-                    value={newRateKRW}
-                    onChange={(e) => setNewRateKRW(e.target.value)}
+                    placeholder={`요금 (${currencySymbol})`}
+                    value={newRate}
+                    onChange={(e) => setNewRate(e.target.value)}
                     type="number"
                   />
                   <div className="flex gap-1">
@@ -332,8 +352,7 @@ export function ShippingRateManager() {
                       onClick={() => {
                         setIsAddingRate(false)
                         setNewCbm("")
-                        setNewRateUSD("")
-                        setNewRateKRW("")
+                        setNewRate("")
                       }}
                     >
                       취소
@@ -351,35 +370,37 @@ export function ShippingRateManager() {
                     <thead>
                       <tr className="border-b border-gray-200">
                         <th className="text-left py-2 px-2 text-gray-500 font-medium">CBM</th>
-                        <th className="text-right py-2 px-2 text-gray-500 font-medium">USD</th>
-                        <th className="text-right py-2 px-2 text-gray-500 font-medium">KRW</th>
+                        <th className="text-right py-2 px-2 text-gray-500 font-medium">요금 ({currencySymbol})</th>
                         <th className="w-10"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rates.map((rate) => (
-                        <tr key={rate._id} className="border-b border-gray-50">
-                          <td className="py-2 px-2 text-gray-900">
-                            {rate.cbm.toFixed(1)}
-                          </td>
-                          <td className="py-2 px-2 text-right text-gray-700">
-                            ${rate.rateUSD.toFixed(2)}
-                          </td>
-                          <td className="py-2 px-2 text-right text-gray-700">
-                            {formatNumberWithCommas(rate.rateKRW)}원
-                          </td>
-                          <td className="py-2 px-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteRate(rate._id)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Trash2 className="h-3 w-3 text-red-400" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {rates.map((rate) => {
+                        // 기존 데이터(rateUSD)와 새 데이터(rate) 호환성 처리
+                        const rateValue = (rate as { rate?: number; rateUSD?: number }).rate
+                          ?? (rate as { rate?: number; rateUSD?: number }).rateUSD
+                          ?? 0
+                        return (
+                          <tr key={rate._id} className="border-b border-gray-50">
+                            <td className="py-2 px-2 text-gray-900">
+                              {rate.cbm.toFixed(1)}
+                            </td>
+                            <td className="py-2 px-2 text-right text-gray-700">
+                              {currencySymbol}{rateValue.toLocaleString()}
+                            </td>
+                            <td className="py-2 px-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteRate(rate._id)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Trash2 className="h-3 w-3 text-red-400" />
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -389,7 +410,8 @@ export function ShippingRateManager() {
                 </p>
               )}
             </div>
-          )}
+            )
+          })()}
         </>
       )}
     </div>

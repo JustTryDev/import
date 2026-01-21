@@ -70,6 +70,7 @@ export interface ShippingRateType {
   companyId: Id<"shippingCompanies">
   name: string
   description?: string
+  currency?: "USD" | "CNY" | "KRW"  // 운임 타입별 통화 (기본값: USD)
   isDefault: boolean
   sortOrder: number
   createdAt: number
@@ -81,8 +82,7 @@ export interface InternationalShippingRate {
   _id: Id<"internationalShippingRates">
   rateTypeId: Id<"shippingRateTypes">
   cbm: number
-  rateUSD: number
-  rateKRW: number
+  rate: number  // 요금 (통화는 rateType에서 가져옴)
   createdAt: number
   updatedAt: number
 }

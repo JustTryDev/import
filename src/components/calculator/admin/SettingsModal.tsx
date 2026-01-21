@@ -65,7 +65,7 @@ export function SettingsModal({
                 처음 사용 시 기본 데이터를 생성해주세요
               </p>
               <p className="text-xs text-yellow-600 mt-0.5">
-                Gofort 업체 및 운임 테이블이 자동으로 추가됩니다
+                고포트 업체 및 운임 테이블이 자동으로 추가됩니다
               </p>
             </div>
             <Button

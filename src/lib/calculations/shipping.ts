@@ -7,8 +7,7 @@
 // 국제 운송료 계산 결과
 export interface InternationalShippingResult {
   cbm: number
-  rateUSD: number
-  rateKRW: number
+  rate: number  // 요금 (통화는 rateType에서 가져옴)
 }
 
 // 국내 운송료 설정 타입
@@ -110,8 +109,7 @@ export function calculateInlandShipping(
 // 국제 운송료 조회용 인터페이스 (CBM 테이블에서 조회)
 export interface ShippingRateTable {
   cbm: number
-  rateUSD: number
-  rateKRW: number
+  rate: number  // 요금 (통화는 rateType에서 가져옴)
 }
 
 // 국제 운송료 계산 (테이블 기반)
@@ -132,8 +130,7 @@ export function findShippingRate(
   if (exactMatch) {
     return {
       cbm: roundedCbm,
-      rateUSD: exactMatch.rateUSD,
-      rateKRW: exactMatch.rateKRW,
+      rate: exactMatch.rate,
     }
   }
 
@@ -142,19 +139,16 @@ export function findShippingRate(
   if (upperMatch) {
     return {
       cbm: upperMatch.cbm,
-      rateUSD: upperMatch.rateUSD,
-      rateKRW: upperMatch.rateKRW,
+      rate: upperMatch.rate,
     }
   }
 
   // 범위를 초과하는 경우 마지막 단가로 비례 계산
   const lastRate = sortedRates[sortedRates.length - 1]
-  const unitRateUSD = lastRate.rateUSD / lastRate.cbm
-  const unitRateKRW = lastRate.rateKRW / lastRate.cbm
+  const unitRate = lastRate.rate / lastRate.cbm
 
   return {
     cbm: roundedCbm,
-    rateUSD: Math.round(unitRateUSD * roundedCbm * 100) / 100,
-    rateKRW: Math.round(unitRateKRW * roundedCbm),
+    rate: Math.round(unitRate * roundedCbm * 100) / 100,
   }
 }

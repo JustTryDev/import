@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Check, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { DailyRate } from "@/types/exchange"
@@ -27,8 +28,20 @@ export function ExchangeRateDisplay({
   isLoading,
   onCurrencyChange,
 }: ExchangeRateDisplayProps) {
-  // 테이블 펼침/접힘 상태 (기본: 접힘)
-  const [isExpanded, setIsExpanded] = useState(false)
+  // 테이블 펼침/접힘 상태 (기본: 펼침 → 2초 후 자동 접힘)
+  const [isExpanded, setIsExpanded] = useState(true)
+  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false)
+
+  // 페이지 로드 후 2초 뒤 자동 접힘 (1회만)
+  useEffect(() => {
+    if (!hasAutoCollapsed && history.length > 0) {
+      const timer = setTimeout(() => {
+        setIsExpanded(false)
+        setHasAutoCollapsed(true)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [history.length, hasAutoCollapsed])
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
@@ -217,41 +230,64 @@ export function ExchangeRateDisplay({
                 </div>
               </button>
 
-              {/* 테이블 (펼친 상태에서만 표시) */}
-              {isExpanded && (
-                <div className="mt-2 bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-gray-600 font-medium">날짜</th>
-                        <th className="px-3 py-2 text-right text-gray-600 font-medium">USD</th>
-                        <th className="px-3 py-2 text-right text-gray-600 font-medium">CNY</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((item, index) => (
-                        <tr
-                          key={item.date}
-                          className={index === 0 ? "bg-blue-50" : ""}
-                        >
-                          <td className="px-3 py-2 text-gray-700">
-                            {item.date}
-                            {index === 0 && (
-                              <span className="ml-1 text-blue-500 text-[10px]">(최신)</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-900">
-                            {item.usdRate.toFixed(1)}원
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-900">
-                            {item.cnyRate.toFixed(1)}원
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              {/* 테이블 (펼친 상태에서만 표시, 애니메이션 적용) */}
+              <AnimatePresence initial={false}>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{
+                      height: "auto",
+                      opacity: 1,
+                      transition: {
+                        height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+                        opacity: { duration: 0.2, delay: 0.05 },
+                      },
+                    }}
+                    exit={{
+                      height: 0,
+                      opacity: 0,
+                      transition: {
+                        height: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                        opacity: { duration: 0.1 },
+                      },
+                    }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div className="mt-2 bg-white rounded-lg border border-gray-200 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-gray-600 font-medium">날짜</th>
+                            <th className="px-3 py-2 text-right text-gray-600 font-medium">USD</th>
+                            <th className="px-3 py-2 text-right text-gray-600 font-medium">CNY</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {history.map((item, index) => (
+                            <tr
+                              key={item.date}
+                              className={index === 0 ? "bg-blue-50" : ""}
+                            >
+                              <td className="px-3 py-2 text-gray-700">
+                                {item.date}
+                                {index === 0 && (
+                                  <span className="ml-1 text-blue-500 text-[10px]">(최신)</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-900">
+                                {item.usdRate.toFixed(1)}원
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-900">
+                                {item.cnyRate.toFixed(1)}원
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </>

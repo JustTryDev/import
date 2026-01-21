@@ -71,8 +71,7 @@ export const calculateRate = query({
     if (exactMatch) {
       return {
         cbm: roundedCbm,
-        rateUSD: exactMatch.rateUSD,
-        rateKRW: exactMatch.rateKRW,
+        rate: exactMatch.rate,
       }
     }
 
@@ -80,20 +79,17 @@ export const calculateRate = query({
     if (roundedCbm < sortedRates[0].cbm) {
       return {
         cbm: sortedRates[0].cbm,
-        rateUSD: sortedRates[0].rateUSD,
-        rateKRW: sortedRates[0].rateKRW,
+        rate: sortedRates[0].rate,
       }
     }
 
     const lastRate = sortedRates[sortedRates.length - 1]
     if (roundedCbm > lastRate.cbm) {
       // 마지막 구간의 단가로 계산 (비례 계산)
-      const unitRate = lastRate.rateUSD / lastRate.cbm
-      const unitRateKRW = lastRate.rateKRW / lastRate.cbm
+      const unitRate = lastRate.rate / lastRate.cbm
       return {
         cbm: roundedCbm,
-        rateUSD: Math.round(unitRate * roundedCbm * 100) / 100,
-        rateKRW: Math.round(unitRateKRW * roundedCbm),
+        rate: Math.round(unitRate * roundedCbm * 100) / 100,
       }
     }
 
@@ -106,8 +102,7 @@ export const create = mutation({
   args: {
     rateTypeId: v.id("shippingRateTypes"),
     cbm: v.number(),
-    rateUSD: v.number(),
-    rateKRW: v.number(),
+    rate: v.number(),
   },
   handler: async (ctx, args) => {
     const now = Date.now()
@@ -126,8 +121,7 @@ export const createBulk = mutation({
     rates: v.array(
       v.object({
         cbm: v.number(),
-        rateUSD: v.number(),
-        rateKRW: v.number(),
+        rate: v.number(),
       })
     ),
   },
@@ -154,8 +148,7 @@ export const update = mutation({
   args: {
     id: v.id("internationalShippingRates"),
     cbm: v.optional(v.number()),
-    rateUSD: v.optional(v.number()),
-    rateKRW: v.optional(v.number()),
+    rate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args

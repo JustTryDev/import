@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { formatNumberWithCommas } from "@/lib/format"
 import {
   ChevronDown,
@@ -240,9 +241,30 @@ export function MultiProductCostBreakdown({
                   </div>
                 </div>
 
-                {/* 제품 상세 (펼친 상태) */}
-                {isExpanded && (
-                  <div className="px-4 pb-3 bg-gray-50/50">
+                {/* 제품 상세 (펼친 상태) - 애니메이션 적용 */}
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{
+                        height: "auto",
+                        opacity: 1,
+                        transition: {
+                          height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+                          opacity: { duration: 0.2, delay: 0.05 },
+                        },
+                      }}
+                      exit={{
+                        height: 0,
+                        opacity: 0,
+                        transition: {
+                          height: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                          opacity: { duration: 0.1 },
+                        },
+                      }}
+                      style={{ overflow: "hidden" }}
+                    >
+                      <div className="px-4 pb-3 bg-gray-50/50">
                     {/* ===== 섹션 1: 제품가격 + 공장비용 + 내륙운송료 + 관세 + 부가세 ===== */}
                     <div className="space-y-1 py-2">
                       {/* 1. 제품가격 */}
@@ -434,8 +456,10 @@ export function MultiProductCostBreakdown({
                         />
                       )}
                     </div>
-                  </div>
-                )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )
           })}
@@ -758,7 +782,7 @@ function CostSection({
         <span className="px-2.5 py-1 bg-gray-900 text-white text-xs font-medium rounded">
           {title}
         </span>
-        <span className="text-sm font-medium text-primary">
+        <span className="text-base font-bold text-blue-500">
           {percentage.toFixed(1)}%
         </span>
       </div>

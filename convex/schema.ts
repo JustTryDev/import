@@ -16,6 +16,7 @@ export default defineSchema({
     companyId: v.id("shippingCompanies"), // 업체 ID
     name: v.string(),                      // 운임 타입명 (예: "할인운임제", "일반운임제")
     description: v.optional(v.string()),   // 설명 (예: "월, 수, 금")
+    currency: v.optional(v.string()),      // 통화 ("USD" | "CNY" | "KRW") - 기본값 "USD"
     isDefault: v.boolean(),                // 기본 선택 여부
     sortOrder: v.number(),                 // 정렬 순서
     createdAt: v.number(),
@@ -26,8 +27,7 @@ export default defineSchema({
   internationalShippingRates: defineTable({
     rateTypeId: v.id("shippingRateTypes"), // 운임 타입 ID
     cbm: v.number(),                        // CBM (0.5 단위)
-    rateUSD: v.number(),                    // USD 단가
-    rateKRW: v.number(),                    // KRW 단가 (참고용)
+    rate: v.number(),                       // 요금 (통화는 rateType에서 가져옴)
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_rate_type", ["rateTypeId"])

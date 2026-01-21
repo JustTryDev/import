@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Plus, Package } from "lucide-react"
 import type { Product } from "@/types/shipping"
@@ -104,19 +105,46 @@ export function ProductList({
         </div>
       </div>
 
-      {/* 제품 카드 목록 */}
+      {/* 제품 카드 목록 (추가/삭제 애니메이션) */}
       <div className="space-y-2">
-        {products.map((product, index) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            index={index}
-            onUpdate={handleUpdateProduct}
-            onDelete={() => handleDeleteProduct(product.id)}
-            canDelete={products.length > 1}
-            unitCost={unitCostMap.get(product.id) ?? null}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {products.map((product, index) => (
+            <motion.div
+              key={product.id}
+              initial={{ opacity: 0, height: 0, scale: 0.95 }}
+              animate={{
+                opacity: 1,
+                height: "auto",
+                scale: 1,
+                transition: {
+                  opacity: { duration: 0.2 },
+                  height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+                  scale: { duration: 0.2 },
+                },
+              }}
+              exit={{
+                opacity: 0,
+                height: 0,
+                scale: 0.95,
+                transition: {
+                  opacity: { duration: 0.15 },
+                  height: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                  scale: { duration: 0.15 },
+                },
+              }}
+              style={{ overflow: "hidden" }}
+            >
+              <ProductCard
+                product={product}
+                index={index}
+                onUpdate={handleUpdateProduct}
+                onDelete={() => handleDeleteProduct(product.id)}
+                canDelete={products.length > 1}
+                unitCost={unitCostMap.get(product.id) ?? null}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* 제품이 없을 때 (이론상 불가능하지만 방어 코드) */}

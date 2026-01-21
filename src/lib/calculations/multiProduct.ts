@@ -70,6 +70,7 @@ export interface CalculateMultiProductParams {
 
   // 국제 운송료 테이블
   shippingRates: ShippingRateTable[]
+  rateTypeCurrency?: "USD" | "CNY" | "KRW"  // 운임 타입 통화 (기본값: USD)
 
   // 업체별 공통 비용
   companyCosts: CostItemInput[]
@@ -97,6 +98,7 @@ export function calculateMultiProductImportCost(
     exchangeRates,
     factorySlots,
     shippingRates,
+    rateTypeCurrency = "USD",
     companyCosts,
     orderCount,
     costSettings,
@@ -200,9 +202,20 @@ export function calculateMultiProductImportCost(
   const inlandShippingUSD = calculateInlandShipping(totalCbm, costSettings?.inland)
   const inlandShippingKRW = Math.round(inlandShippingUSD * exchangeRates.usd)
 
-  // 국제 운송료
+  // 국제 운송료 (통화별 환율 적용)
   const shippingResult = findShippingRate(shippingRates, totalCbm)
-  const internationalShippingKRW = shippingResult?.rateKRW ?? 0
+  const internationalShippingRate = shippingResult?.rate ?? 0
+
+  // 통화별 환율 적용하여 원화 계산
+  let internationalShippingKRW: number
+  if (rateTypeCurrency === "KRW") {
+    internationalShippingKRW = internationalShippingRate
+  } else if (rateTypeCurrency === "CNY") {
+    internationalShippingKRW = Math.round(internationalShippingRate * exchangeRates.cny)
+  } else {
+    // 기본값 USD
+    internationalShippingKRW = Math.round(internationalShippingRate * exchangeRates.usd)
+  }
 
   // 국내 운송료
   const domesticShippingKRW = calculateDomesticShipping(totalCbm, costSettings?.domestic)

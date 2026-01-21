@@ -5,23 +5,17 @@ const generateGofortRates = () => {
   const rates = []
   for (let cbm = 0.5; cbm <= 70; cbm += 0.5) {
     // 할인운임제: CBM * 67.00 USD (월, 수, 금)
-    const discountUSD = cbm * 67.0
+    const discountRate = cbm * 67.0
     // 일반운임제: CBM * 75.00 USD (일, 화, 목)
-    const normalUSD = cbm * 75.0
+    const normalRate = cbm * 75.0
     // 평균요금제: (할인 + 일반) / 2
-    const averageUSD = (discountUSD + normalUSD) / 2
-
-    // KRW 환산 (1 USD = 1,492.8원 기준 - 표 기준)
-    const exchangeRate = 1492.8
+    const averageRate = (discountRate + normalRate) / 2
 
     rates.push({
       cbm,
-      discountUSD: Math.round(discountUSD * 100) / 100,
-      discountKRW: Math.round(discountUSD * exchangeRate),
-      normalUSD: Math.round(normalUSD * 100) / 100,
-      normalKRW: Math.round(normalUSD * exchangeRate),
-      averageUSD: Math.round(averageUSD * 100) / 100,
-      averageKRW: Math.round(averageUSD * exchangeRate),
+      discountRate: Math.round(discountRate * 100) / 100,
+      normalRate: Math.round(normalRate * 100) / 100,
+      averageRate: Math.round(averageRate * 100) / 100,
     })
   }
   return rates
@@ -48,11 +42,12 @@ export const seedInitialData = mutation({
       updatedAt: now,
     })
 
-    // 3. 운임 타입 생성 (할인, 일반, 평균)
+    // 3. 운임 타입 생성 (할인, 일반, 평균) - 모두 USD 통화
     const discountTypeId = await ctx.db.insert("shippingRateTypes", {
       companyId: gofortId,
       name: "할인운임제",
       description: "월, 수, 금 출항",
+      currency: "USD",
       isDefault: false,
       sortOrder: 1,
       createdAt: now,
@@ -63,6 +58,7 @@ export const seedInitialData = mutation({
       companyId: gofortId,
       name: "일반운임제",
       description: "일, 화, 목 출항",
+      currency: "USD",
       isDefault: false,
       sortOrder: 2,
       createdAt: now,
@@ -73,6 +69,7 @@ export const seedInitialData = mutation({
       companyId: gofortId,
       name: "평균요금제",
       description: "할인 + 일반 평균",
+      currency: "USD",
       isDefault: true,
       sortOrder: 3,
       createdAt: now,
@@ -87,8 +84,7 @@ export const seedInitialData = mutation({
       await ctx.db.insert("internationalShippingRates", {
         rateTypeId: discountTypeId,
         cbm: rate.cbm,
-        rateUSD: rate.discountUSD,
-        rateKRW: rate.discountKRW,
+        rate: rate.discountRate,
         createdAt: now,
         updatedAt: now,
       })
@@ -97,8 +93,7 @@ export const seedInitialData = mutation({
       await ctx.db.insert("internationalShippingRates", {
         rateTypeId: normalTypeId,
         cbm: rate.cbm,
-        rateUSD: rate.normalUSD,
-        rateKRW: rate.normalKRW,
+        rate: rate.normalRate,
         createdAt: now,
         updatedAt: now,
       })
@@ -107,8 +102,7 @@ export const seedInitialData = mutation({
       await ctx.db.insert("internationalShippingRates", {
         rateTypeId: averageTypeId,
         cbm: rate.cbm,
-        rateUSD: rate.averageUSD,
-        rateKRW: rate.averageKRW,
+        rate: rate.averageRate,
         createdAt: now,
         updatedAt: now,
       })

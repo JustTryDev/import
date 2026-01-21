@@ -7,7 +7,13 @@
  */
 
 import { ImportCalculator } from "@/components/calculator"
+import { RtonCalculatorBanner } from "@/components/calculator/RtonCalculatorBanner"
 
 export default function Home() {
-  return <ImportCalculator />
+  return (
+    <>
+      <ImportCalculator />
+      <RtonCalculatorBanner />
+    </>
+  )
 }

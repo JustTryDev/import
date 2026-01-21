@@ -345,6 +345,15 @@ export {
 export { calculateMultiProductImportCost } from "./multiProduct"
 export type { CalculateMultiProductParams } from "./multiProduct"
 
+// R.TON 계산 함수
+export {
+  convertToKg,
+  calculateWeightTon,
+  calculateRTon,
+  calculateProductRTon,
+} from "./rton"
+export type { WeightUnit, ProductRTonInfo } from "./rton"
+
 export type {
   ShippingRateTable,
   DomesticShippingConfig,

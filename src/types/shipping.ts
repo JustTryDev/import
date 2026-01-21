@@ -19,6 +19,10 @@ export interface Product {
   quantity: number                  // 수량
   dimensions: ProductDimensions     // 제품 크기 (cm)
 
+  // 중량 정보 (R.TON 계산용)
+  weight: number                    // 개당 중량
+  weightUnit: "kg" | "g"            // 중량 단위 (기본값: "kg")
+
   // 관세 정보 (제품마다 다름)
   hsCode: HsCodeWithTariff | null   // 선택된 HS Code 정보
   basicTariffRate: number           // 기본 관세율 (%)
@@ -258,10 +262,17 @@ export interface ProductCalculationResult {
   productId: string               // 제품 ID
   productName?: string            // 제품명
 
-  // CBM 정보
-  unitCbm: number                 // 단일 제품 CBM
-  totalCbm: number                // 해당 제품 총 CBM
-  cbmRatio: number                // 전체 대비 CBM 비율 (0~1)
+  // R.TON (CBM) 정보
+  unitCbm: number                 // 단일 제품 CBM (원래 부피)
+  totalCbm: number                // 해당 제품 총 R.TON (= MAX(W/T, M/T))
+  cbmRatio: number                // 전체 대비 R.TON 비율 (0~1)
+
+  // 중량 정보 (R.TON 계산용)
+  unitWeight: number              // 개당 중량 (kg로 환산)
+  totalWeight: number             // 총 중량 (kg)
+  weightTon: number               // W/T (중량톤 = 총중량/1000)
+  measurementTon: number          // M/T (용적톤 = 원래 CBM)
+  rTon: number                    // R.TON = MAX(W/T, M/T)
 
   // 제품 비용
   productPriceKRW: number         // 제품가격 (원화)
@@ -325,9 +336,10 @@ export interface MultiProductCalculationResult {
   // 제품별 결과
   products: ProductCalculationResult[]
 
-  // 전체 합계
-  totalCbm: number                // 전체 CBM
-  roundedCbm: number              // 0.5 단위 올림 CBM
+  // 전체 R.TON (CBM) 합계
+  totalCbm: number                // 전체 R.TON (= MAX(W/T, M/T) 합계)
+  roundedCbm: number              // 운송 업체 타입별 올림 적용된 R.TON
+  totalWeight: number             // 전체 중량 (kg)
   totalCost: number               // 전체 수입원가
 
   // 공통 비용 내역 (분배 전 총액)

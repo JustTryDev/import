@@ -20,7 +20,9 @@ import type { Product, ProductDimensions } from "@/types/shipping"
 import {
   calculateUnitCbm,
   calculateTotalCbm,
+  calculateProductRTon,
 } from "@/lib/calculations"
+import type { WeightUnit } from "@/lib/calculations"
 
 interface ProductCardProps {
   product: Product
@@ -63,9 +65,18 @@ export function ProductCard({
     clear: clearSearch,
   } = useTariffSearch()
 
-  // ===== CBM 계산 =====
+  // ===== R.TON (CBM) 계산 =====
   const unitCbm = calculateUnitCbm(product.dimensions)
-  const totalCbm = calculateTotalCbm(product.dimensions, product.quantity)
+  const originalCbm = calculateTotalCbm(product.dimensions, product.quantity)
+
+  // R.TON 계산: MAX(W/T, M/T)
+  const rTonInfo = calculateProductRTon(
+    product.weight ?? 0,
+    (product.weightUnit ?? "kg") as WeightUnit,
+    product.quantity,
+    originalCbm
+  )
+  const totalCbm = rTonInfo.rTon  // R.TON 값을 totalCbm으로 사용
 
   // ===== 핸들러 =====
   // 통화 변경
@@ -93,6 +104,26 @@ export function ProductCard({
     const numericValue = value.replace(/[^0-9]/g, "")
     const num = parseInt(numericValue) || 0
     onUpdate({ ...product, quantity: Math.min(num, 1000000) })
+  }
+
+  // 중량 변경 (천 단위 구분자 지원)
+  const handleWeightChange = (value: string) => {
+    const cleaned = value.replace(/,/g, "").replace(/[^0-9.]/g, "")
+    const parts = cleaned.split(".")
+    let result = parts[0]
+    // kg: 소수점 2자리, g: 정수
+    if (parts.length > 1 && product.weightUnit !== "g") {
+      result = parts[0] + "." + parts[1].slice(0, 2)
+    }
+    const numValue = parseFloat(result) || 0
+    // 최대값: kg=10,000, g=10,000,000
+    const maxWeight = product.weightUnit === "g" ? 10000000 : 10000
+    onUpdate({ ...product, weight: Math.min(numValue, maxWeight) })
+  }
+
+  // 중량 단위 변경
+  const handleWeightUnitChange = (unit: "kg" | "g") => {
+    onUpdate({ ...product, weightUnit: unit })
   }
 
   // 크기 변경
@@ -240,8 +271,8 @@ export function ProductCard({
               )}
               {/* 크기 */}
               <span>{dimensionStr}</span>
-              {/* 실제 합계 CBM */}
-              <span className="font-mono">{totalCbm.toFixed(2)} CBM</span>
+              {/* 실제 합계 R.TON (CBM) */}
+              <span className="font-mono">{totalCbm.toFixed(2)} R.TON (CBM)</span>
               {/* 적용 관세율 */}
               <span>
                 {product.useFta ? "FTA " : "기본 "}
@@ -352,8 +383,8 @@ export function ProductCard({
             )}
           </div>
 
-          {/* 통화 + 단가 + 수량 (3열) */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* 통화 + 단가 + 수량 + 중량 + 단위 (5열) */}
+          <div className="grid grid-cols-5 gap-2">
             {/* 통화 선택 */}
             <div>
               <Label className="text-xs text-gray-500">통화</Label>
@@ -397,6 +428,37 @@ export function ProductCard({
                 decimal={0}
                 className="mt-1"
               />
+            </div>
+
+            {/* 중량 입력 */}
+            <div>
+              <Label className="text-xs text-gray-500">중량</Label>
+              <NumberInput
+                value={product.weight ?? 0}
+                onChange={handleWeightChange}
+                min={0}
+                max={product.weightUnit === "g" ? 10000000 : 10000}
+                step={product.weightUnit === "g" ? 1 : 0.1}
+                decimal={product.weightUnit === "g" ? 0 : 2}
+                className="mt-1"
+              />
+            </div>
+
+            {/* 중량 단위 */}
+            <div>
+              <Label className="text-xs text-gray-500">단위</Label>
+              <Select
+                value={product.weightUnit ?? "kg"}
+                onValueChange={handleWeightUnitChange}
+              >
+                <SelectTrigger className="mt-1 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kg">kg</SelectItem>
+                  <SelectItem value="g">g</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -444,9 +506,9 @@ export function ProductCard({
               </div>
             </div>
 
-            {/* CBM 표시 (소수점 2자리) */}
+            {/* R.TON (CBM) 표시 */}
             <div>
-              <Label className="text-xs text-gray-500">CBM</Label>
+              <Label className="text-xs text-gray-500">R.TON (CBM)</Label>
               <div className="mt-1 px-2 py-1.5 bg-gray-50 rounded text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">단위:</span>
@@ -458,6 +520,12 @@ export function ProductCard({
                     {totalCbm.toFixed(2)}
                   </span>
                 </div>
+                {/* 중량 입력 시 W/T, M/T 상세 표시 */}
+                {(product.weight ?? 0) > 0 && (
+                  <div className="border-t border-gray-200 mt-1 pt-1 text-xs text-gray-400">
+                    W/T (중량): {rTonInfo.weightTon.toFixed(2)} | M/T (부피): {rTonInfo.measurementTon.toFixed(2)}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -562,6 +630,8 @@ export function createEmptyProduct(id: string): Product {
     currency: "USD",  // 기본값: 미국 달러
     quantity: 0,
     dimensions: { width: 10, height: 10, depth: 10 },
+    weight: 0,  // 중량 기본값: 0 (미입력 시 R.TON = CBM)
+    weightUnit: "kg",  // 중량 단위 기본값: kg
     hsCode: DEFAULT_HS_CODE,  // 기본값: 봉제 인형
     basicTariffRate: DEFAULT_HS_CODE.basicRate,
     ftaTariffRate: DEFAULT_HS_CODE.chinaFtaRate ?? 0,

@@ -6,7 +6,8 @@ import { Plus, Package } from "lucide-react"
 import type { Product } from "@/types/shipping"
 import type { ProductCalculationResult } from "@/types/shipping"
 import { ProductCard, createEmptyProduct } from "./ProductCard"
-import { roundCbmToHalf, calculateTotalCbm } from "@/lib/calculations"
+import { roundCbmToHalf, calculateTotalCbm, calculateProductRTon } from "@/lib/calculations"
+import type { WeightUnit } from "@/lib/calculations"
 
 interface ProductListProps {
   products: Product[]
@@ -47,11 +48,18 @@ export function ProductList({
     setProducts(products.map((p) => (p.id === updated.id ? updated : p)))
   }, [products, setProducts])
 
-  // 전체 CBM 계산
-  const totalCbm = products.reduce((sum, p) => {
-    return sum + calculateTotalCbm(p.dimensions, p.quantity)
+  // 전체 R.TON 계산 (= MAX(W/T, CBM))
+  const totalRTon = products.reduce((sum, p) => {
+    const cbm = calculateTotalCbm(p.dimensions, p.quantity)
+    const rTonInfo = calculateProductRTon(
+      p.weight ?? 0,
+      (p.weightUnit ?? "kg") as WeightUnit,
+      p.quantity,
+      cbm
+    )
+    return sum + rTonInfo.rTon
   }, 0)
-  const roundedTotalCbm = roundCbmToHalf(totalCbm)
+  const roundedTotalRTon = roundCbmToHalf(totalRTon)
 
   // 제품별 개당 수입원가 맵 생성
   const unitCostMap = new Map<string, number>()
@@ -69,17 +77,17 @@ export function ProductList({
           <span className="text-xs text-gray-400">({products.length}개)</span>
         </div>
         <div className="flex items-center gap-3">
-          {/* 전체 CBM 표시: 실제 CBM + 적용 CBM */}
-          {totalCbm > 0 && (
+          {/* 전체 R.TON (CBM) 표시: 실제 R.TON + 적용 R.TON */}
+          {totalRTon > 0 && (
             <div className="flex items-center gap-2 text-xs">
-              {/* 실제 CBM (소수점 2자리) */}
+              {/* 실제 R.TON (CBM) */}
               <span className="text-gray-500">
-                실제: <span className="font-mono">{totalCbm.toFixed(2)}</span>
+                R.TON (CBM): <span className="font-mono">{totalRTon.toFixed(2)}</span>
               </span>
               <span className="text-gray-300">→</span>
-              {/* 적용 CBM (0.5 단위 반올림) */}
+              {/* 적용 R.TON (CBM) (운송사 타입별 올림) */}
               <span className="text-gray-500">
-                적용: <span className="font-medium text-primary">{roundedTotalCbm.toFixed(1)}</span>
+                적용: <span className="font-medium text-primary">{roundedTotalRTon.toFixed(1)}</span>
               </span>
             </div>
           )}

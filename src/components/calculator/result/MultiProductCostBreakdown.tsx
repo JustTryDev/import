@@ -109,28 +109,28 @@ export function MultiProductCostBreakdown({
   const isWireTransferForDetail = remittanceFeeBaseForDetail >= 1_000_000
   const paymentMethodForDetail = isWireTransferForDetail ? "T/T 송금" : "카드 결제"
 
-  // 비용 설정 설명 텍스트 생성
+  // 비용 설정 설명 텍스트 생성 (R.TON 기준)
   const getInlandDescription = () => {
     if (costSettings?.inland) {
-      return `CBM당 $${costSettings.inland.ratePerCbm}`
+      return `R.TON (CBM)당 $${costSettings.inland.ratePerCbm}`
     }
-    return "CBM당 $35"
+    return "R.TON (CBM)당 $35"
   }
 
   const getDomesticDescription = () => {
     if (costSettings?.domestic) {
       const { baseFee, baseCbm, extraUnit, extraRate } = costSettings.domestic
-      return `기본 ${formatNumberWithCommas(baseFee)}원(${baseCbm}CBM), ${extraUnit}CBM당 ${formatNumberWithCommas(extraRate)}원 추가`
+      return `기본 ${formatNumberWithCommas(baseFee)}원(${baseCbm} R.TON (CBM)), ${extraUnit} R.TON (CBM)당 ${formatNumberWithCommas(extraRate)}원 추가`
     }
-    return "기본 35,000원(2CBM), 0.5CBM당 8,750원 추가"
+    return "기본 35,000원(2 R.TON (CBM)), 0.5 R.TON (CBM)당 8,750원 추가"
   }
 
   const getThreePLDescription = () => {
     if (costSettings?.threePL) {
       const { ratePerUnit, unit } = costSettings.threePL
-      return `${unit}CBM당 ${formatNumberWithCommas(ratePerUnit)}원`
+      return `${unit}R.TON (CBM)당 ${formatNumberWithCommas(ratePerUnit)}원`
     }
-    return "1CBM당 50,000원"
+    return "1R.TON (CBM)당 50,000원"
   }
 
   return (
@@ -181,7 +181,7 @@ export function MultiProductCostBreakdown({
                       <div className="text-xs text-gray-500 text-left">
                         {product?.currency === "USD" ? "$" : "¥"}{product?.unitPrice?.toLocaleString()} × {product?.quantity?.toLocaleString()}개
                         <span className="mx-1">·</span>
-                        CBM {productResult.totalCbm.toFixed(2)}
+                        R.TON (CBM) {productResult.totalCbm.toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -296,7 +296,7 @@ export function MultiProductCostBreakdown({
                         label="중국 내륙 운송료"
                         value={productResult.sharedCosts.inlandShipping}
                         foreignValue={formatForeign(toForeignCurrency(productResult.sharedCosts.inlandShipping, "USD"), "USD")}
-                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
+                        subLabel={`R.TON (CBM) 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
 
                       {/* 4. 송금 & 결제 수수료 (제품 수로 균등 분배) */}
@@ -377,7 +377,7 @@ export function MultiProductCostBreakdown({
                         label="국제 운송료"
                         value={productResult.sharedCosts.internationalShipping}
                         foreignValue={formatForeign(toForeignCurrency(productResult.sharedCosts.internationalShipping, "USD"), "USD")}
-                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
+                        subLabel={`R.TON (CBM) 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
 
                       {/* 8-10. 공통 비용 (통관 수수료 제외) - orderCount로 나눈 값을 그대로 표시 */}
@@ -410,14 +410,14 @@ export function MultiProductCostBreakdown({
                       <CostRow
                         label="국내 운송료"
                         value={productResult.sharedCosts.domesticShipping}
-                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
+                        subLabel={`R.TON (CBM) 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
 
                       {/* 12. 3PL비용 + 배송비 */}
                       <CostRow
                         label="3PL 비용 + 배송비"
                         value={productResult.sharedCosts.threePL}
-                        subLabel={`CBM 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
+                        subLabel={`R.TON (CBM) 비율 ${(productResult.cbmRatio * 100).toFixed(1)}%`}
                       />
                     </div>
 
@@ -658,7 +658,7 @@ function TotalCostBreakdown({
           <SectionCostRow label="총 제품 가격" value={productCostTotal} />
           <SectionCostRow label="총 추가 비용" value={additionalCostTotal} />
           <SectionCostRow
-            label={`중국 내륙 운송료 ($${inlandRatePerCbm} / CBM)`}
+            label={`중국 내륙 운송료 ($${inlandRatePerCbm} / R.TON (CBM))`}
             value={inlandShippingTotal}
             foreignValue={formatUSD(toUSD(inlandShippingTotal))}
           />
@@ -687,7 +687,7 @@ function TotalCostBreakdown({
           percentage={getPercentage(internationalSectionTotal)}
         >
           <SectionCostRow
-            label={`국제 운송료 (${result.totalCbm.toFixed(2)}CBM → ${result.roundedCbm.toFixed(1)}CBM 적용)`}
+            label={`국제 운송료 (${result.totalCbm.toFixed(2)} R.TON (CBM) → ${result.roundedCbm.toFixed(1)} R.TON (CBM) 적용)`}
             value={internationalShipping}
             foreignValue={formatUSD(toUSD(internationalShipping))}
           />
@@ -704,11 +704,11 @@ function TotalCostBreakdown({
         >
           <SectionCostRow label="통관 수수료" value={customsClearanceFee} />
           <SectionCostRow
-            label={`국내 운송료 (기본 ${domesticBaseCbm}CBM, +${domesticExtraUnit}CBM ₩${formatNumberWithCommas(domesticExtraRate)})`}
+            label={`국내 운송료 (기본 ${domesticBaseCbm} R.TON (CBM), +${domesticExtraUnit} R.TON (CBM) ₩${formatNumberWithCommas(domesticExtraRate)})`}
             value={domesticShipping}
           />
           <SectionCostRow
-            label={`3PL + 배송비 (기본 ${threePLUnit}CBM, +${threePLUnit}CBM ₩${formatNumberWithCommas(threePLRate)})`}
+            label={`3PL + 배송비 (기본 ${threePLUnit} R.TON (CBM), +${threePLUnit} R.TON (CBM) ₩${formatNumberWithCommas(threePLRate)})`}
             value={threePL}
           />
         </CostSection>

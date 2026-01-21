@@ -28,6 +28,7 @@ import {
   roundCbmToHalf,
   isValidDimensions,
 } from "./cbm"
+import { calculateProductRTon } from "./rton"
 import {
   calculateDomesticShipping,
   calculateRemittanceFee,
@@ -115,20 +116,41 @@ export function calculateMultiProductImportCost(
     return null
   }
 
-  // ===== 1. 제품별 CBM 계산 =====
+  // ===== 1. 제품별 R.TON (CBM) 계산 =====
   const productsWithCbm = validProducts.map(product => {
+    // 원래 CBM 계산
     const unitCbm = calculateUnitCbm(product.dimensions)
-    const totalCbm = calculateTotalCbm(product.dimensions, product.quantity)
+    const originalCbm = calculateTotalCbm(product.dimensions, product.quantity)
+
+    // R.TON 계산: MAX(W/T, M/T)
+    // 중량 미입력(0) 시 → W/T=0, R.TON=CBM (기존 동작 유지)
+    const rTonInfo = calculateProductRTon(
+      product.weight ?? 0,           // 개당 중량 (없으면 0)
+      product.weightUnit ?? "kg",    // 중량 단위 (없으면 kg)
+      product.quantity,
+      originalCbm                    // 원래 CBM = M/T
+    )
+
+    // R.TON 값을 totalCbm으로 사용 (기존 로직 유지)
+    const totalCbm = rTonInfo.rTon
+
     return {
       ...product,
       unitCbm,
-      totalCbm,
+      totalCbm,       // R.TON 값 (기존 CBM 자리에 대입)
+      // R.TON 상세 정보
+      unitWeight: rTonInfo.unitWeight,
+      totalWeight: rTonInfo.totalWeight,
+      weightTon: rTonInfo.weightTon,
+      measurementTon: rTonInfo.measurementTon,
+      rTon: rTonInfo.rTon,
     }
   })
 
-  // 전체 CBM 계산
+  // 전체 R.TON (CBM) 계산
   const totalCbm = productsWithCbm.reduce((sum, p) => sum + p.totalCbm, 0)
   const roundedCbm = roundCbmToHalf(totalCbm)
+  const totalWeight = productsWithCbm.reduce((sum, p) => sum + p.totalWeight, 0)
 
   // ===== 2. 제품별 관세/부가세 계산 =====
   const productsWithTariff = productsWithCbm.map(product => {
@@ -282,9 +304,17 @@ export function calculateMultiProductImportCost(
     return {
       productId: product.id,
       productName: product.name,
+      // R.TON (CBM) 정보
       unitCbm: product.unitCbm,
-      totalCbm: product.totalCbm,
+      totalCbm: product.totalCbm,  // R.TON 값
       cbmRatio: sharedCosts.cbmRatio,
+      // 중량 정보 (R.TON 계산용)
+      unitWeight: product.unitWeight,
+      totalWeight: product.totalWeight,
+      weightTon: product.weightTon,
+      measurementTon: product.measurementTon,
+      rTon: product.rTon,
+      // 비용 정보
       productPriceKRW: product.productPriceKRW,
       tariffRate: product.tariffRate,
       tariffAmount,
@@ -311,8 +341,9 @@ export function calculateMultiProductImportCost(
 
   return {
     products: productResults,
-    totalCbm,
-    roundedCbm,
+    totalCbm,      // 전체 R.TON
+    roundedCbm,    // 운송 업체 타입별 올림 적용된 R.TON
+    totalWeight,   // 전체 중량 (kg)
     totalCost,
     sharedCostsTotal: {
       inlandShipping: inlandShippingKRW,

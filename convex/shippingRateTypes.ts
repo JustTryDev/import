@@ -26,7 +26,7 @@ export const create = mutation({
     companyId: v.id("shippingCompanies"),
     name: v.string(),
     description: v.optional(v.string()),
-    currency: v.optional(v.string()),  // "USD" | "CNY" | "KRW" (기본값: USD)
+    currency: v.optional(v.union(v.literal("USD"), v.literal("CNY"), v.literal("KRW"))),  // 기본값: USD
     isDefault: v.boolean(),
     sortOrder: v.number(),
   },
@@ -61,7 +61,7 @@ export const update = mutation({
     id: v.id("shippingRateTypes"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
-    currency: v.optional(v.string()),  // "USD" | "CNY" | "KRW"
+    currency: v.optional(v.union(v.literal("USD"), v.literal("CNY"), v.literal("KRW"))),
     isDefault: v.optional(v.boolean()),
     sortOrder: v.optional(v.number()),
   },

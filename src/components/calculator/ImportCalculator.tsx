@@ -386,16 +386,17 @@ export function ImportCalculator() {
 
   return (
     <div className="h-screen bg-gray-50">
-      {/* 메인 컨텐츠 - 좌우 2단 레이아웃 (50:50) */}
+      {/* 메인 컨텐츠 - 좌우 리사이즈 가능한 레이아웃 */}
       <main className="h-full px-4 py-3 overflow-hidden">
-        <div className="h-full grid grid-cols-2 gap-6">
+        <PanelGroup direction="horizontal" className="h-full">
           {/* 좌측: 입력 영역 */}
-          <motion.div
-            className="space-y-3 overflow-y-auto pr-2"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
+          <Panel defaultSize={50} minSize={30} maxSize={70}>
+            <motion.div
+              className="h-full space-y-3 overflow-y-auto pr-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
             {/* 1. 오늘의 환율 (표시 전용, 통화 선택은 제품 카드에서) */}
             <motion.div variants={itemVariants}>
               <ExchangeRateDisplay

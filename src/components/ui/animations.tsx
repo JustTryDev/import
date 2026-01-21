@@ -14,9 +14,9 @@ import { motion, AnimatePresence, HTMLMotionProps, Variants } from "framer-motio
 import { ReactNode, forwardRef } from "react"
 
 // ===== 기본 애니메이션 설정 (토스 스타일) =====
-// 부드러운 이징 커브
-const EASE_SMOOTH = [0.25, 0.1, 0.25, 1]
-const EASE_OUT = [0, 0, 0.2, 1]
+// 부드러운 이징 커브 (as const로 타입 고정)
+const EASE_SMOOTH = [0.25, 0.1, 0.25, 1] as const
+const EASE_OUT = [0, 0, 0.2, 1] as const
 
 // 기본 지속 시간 (초)
 const DURATION = {

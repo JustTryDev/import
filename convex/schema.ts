@@ -16,7 +16,7 @@ export default defineSchema({
     companyId: v.id("shippingCompanies"), // 업체 ID
     name: v.string(),                      // 운임 타입명 (예: "할인운임제", "일반운임제")
     description: v.optional(v.string()),   // 설명 (예: "월, 수, 금")
-    currency: v.optional(v.string()),      // 통화 ("USD" | "CNY" | "KRW") - 기본값 "USD"
+    currency: v.optional(v.union(v.literal("USD"), v.literal("CNY"), v.literal("KRW"))),  // 통화 - 기본값 "USD"
     isDefault: v.boolean(),                // 기본 선택 여부
     sortOrder: v.number(),                 // 정렬 순서
     createdAt: v.number(),

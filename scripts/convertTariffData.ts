@@ -11,7 +11,8 @@
  * 3. public/data/tariff-data.json 파일이 생성됩니다
  */
 
-import * as XLSX from "xlsx"
+// exceljs: xlsx 대체 라이브러리 (보안 취약점 없음)
+import ExcelJS from "exceljs"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -77,6 +78,76 @@ function normalizeHsCode(code: string | number): string {
 }
 
 /**
+ * 셀 값 가져오기 (ExcelJS의 셀 값 형식 처리)
+ * ExcelJS는 셀 값이 객체일 수 있음 (수식, 리치 텍스트 등)
+ */
+function getCellValue(cell: ExcelJS.CellValue): string | number | null {
+  if (cell === null || cell === undefined) {
+    return null
+  }
+
+  // 객체인 경우 (수식 결과, 리치 텍스트 등)
+  if (typeof cell === "object") {
+    // 수식 결과인 경우
+    if ("result" in cell) {
+      return cell.result as string | number
+    }
+    // 리치 텍스트인 경우
+    if ("richText" in cell) {
+      const richText = cell.richText as { text: string }[]
+      return richText.map((t) => t.text).join("")
+    }
+    // Date 객체인 경우
+    if (cell instanceof Date) {
+      return cell.toISOString()
+    }
+    // 기타 객체는 문자열로 변환
+    return String(cell)
+  }
+
+  // boolean인 경우 문자열로 변환
+  if (typeof cell === "boolean") {
+    return cell ? "true" : "false"
+  }
+
+  return cell as string | number
+}
+
+/**
+ * Excel 워크시트를 JSON 객체 배열로 변환
+ * (xlsx의 sheet_to_json과 유사한 기능)
+ */
+function worksheetToJson(worksheet: ExcelJS.Worksheet): Record<string, unknown>[] {
+  const jsonData: Record<string, unknown>[] = []
+  const headers: string[] = []
+
+  // 첫 번째 행을 헤더로 사용
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      // 헤더 행 처리
+      row.eachCell((cell, colNumber) => {
+        headers[colNumber] = String(getCellValue(cell.value) || `Column${colNumber}`)
+      })
+    } else {
+      // 데이터 행 처리
+      const rowData: Record<string, unknown> = {}
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber]
+        if (header) {
+          rowData[header] = getCellValue(cell.value)
+        }
+      })
+      // 빈 행이 아닌 경우만 추가
+      if (Object.keys(rowData).length > 0) {
+        jsonData.push(rowData)
+      }
+    }
+  })
+
+  return jsonData
+}
+
+/**
  * 메인 변환 함수
  */
 async function convertExcelToJson() {
@@ -120,10 +191,16 @@ async function convertExcelToJson() {
     console.log(`\n📖 파일 처리 중: ${fileName}`)
 
     try {
-      const workbook = XLSX.readFile(filePath)
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+      // ExcelJS로 파일 읽기
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.readFile(filePath)
+
+      // 첫 번째 워크시트 가져오기
+      const worksheet = workbook.worksheets[0]
+      const sheetName = worksheet.name
+
+      // 워크시트를 JSON으로 변환
+      const jsonData = worksheetToJson(worksheet)
 
       console.log(`   - 시트: ${sheetName}`)
       console.log(`   - 행 수: ${jsonData.length}`)

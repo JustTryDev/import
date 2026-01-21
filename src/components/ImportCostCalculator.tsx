@@ -446,7 +446,7 @@ export function ImportCostCalculator() {
               {/* 상세 내역 */}
               <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">제품가격</span>
+                  <span className="text-gray-500">제품 가격</span>
                   <span className="text-gray-700">
                     ¥{formatNumber(costResult.productPriceCny)} →{" "}
                     <span className="font-medium">₩{formatNumber(costResult.productPriceKrw)}</span>

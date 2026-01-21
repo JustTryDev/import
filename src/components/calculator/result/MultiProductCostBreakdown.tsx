@@ -141,7 +141,7 @@ export function MultiProductCostBreakdown({
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">
-              제품별 비용 내역
+              제품 별 비용 내역
             </span>
           </div>
         </div>
@@ -247,7 +247,7 @@ export function MultiProductCostBreakdown({
                     <div className="space-y-1 py-2">
                       {/* 1. 제품가격 */}
                       <CostRowWithForeign
-                        label="제품가격"
+                        label="제품 가격"
                         value={productResult.productPriceKRW}
                         foreignValue={productForeignPrice}
                         subLabel={`${product?.currency === "USD" ? "$" : "¥"}${product?.unitPrice?.toLocaleString()} × ${product?.quantity?.toLocaleString()}`}
@@ -658,7 +658,7 @@ function TotalCostBreakdown({
           <SectionCostRow label="총 제품 가격" value={productCostTotal} />
           <SectionCostRow label="총 추가 비용" value={additionalCostTotal} />
           <SectionCostRow
-            label={`내륙 운송료 ($${inlandRatePerCbm} / CBM)`}
+            label={`중국 내륙 운송료 ($${inlandRatePerCbm} / CBM)`}
             value={inlandShippingTotal}
             foreignValue={formatUSD(toUSD(inlandShippingTotal))}
           />

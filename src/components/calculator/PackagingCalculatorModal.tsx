@@ -296,7 +296,7 @@ export function PackagingCalculatorModal({
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
           >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">

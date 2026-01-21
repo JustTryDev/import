@@ -293,7 +293,7 @@ export function ProductCard({
               height: "auto",
               opacity: 1,
               transition: {
-                height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+                height: { duration: 0.25, ease: "easeOut" },
                 opacity: { duration: 0.2, delay: 0.05 },
               },
             }}
@@ -301,7 +301,7 @@ export function ProductCard({
               height: 0,
               opacity: 0,
               transition: {
-                height: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                height: { duration: 0.2, ease: "easeOut" },
                 opacity: { duration: 0.1 },
               },
             }}

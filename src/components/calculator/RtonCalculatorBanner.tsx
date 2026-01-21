@@ -27,7 +27,7 @@ export function RtonCalculatorBanner() {
         transition={{
           duration: 0.4,
           delay: 0.6,  // 페이지 로드 후 잠시 후 나타남
-          ease: [0.25, 0.1, 0.25, 1],
+          ease: "easeOut",
         }}
         // 호버: 살짝 위로 올라가는 효과
         whileHover={{ y: -3, scale: 1.02 }}

@@ -118,7 +118,7 @@ export function ProductList({
                 scale: 1,
                 transition: {
                   opacity: { duration: 0.2 },
-                  height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+                  height: { duration: 0.25, ease: "easeOut" },
                   scale: { duration: 0.2 },
                 },
               }}
@@ -128,7 +128,7 @@ export function ProductList({
                 scale: 0.95,
                 transition: {
                   opacity: { duration: 0.15 },
-                  height: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                  height: { duration: 0.2, ease: "easeOut" },
                   scale: { duration: 0.15 },
                 },
               }}

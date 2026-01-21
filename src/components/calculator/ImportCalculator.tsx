@@ -379,7 +379,7 @@ export function ImportCalculator() {
       y: 0,
       transition: {
         duration: 0.4,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
   }
@@ -474,7 +474,7 @@ export function ImportCalculator() {
             className="space-y-3 overflow-y-auto"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
           >
             {/* 비용 상세 내역 (다중 제품용) */}
             <MultiProductCostBreakdown

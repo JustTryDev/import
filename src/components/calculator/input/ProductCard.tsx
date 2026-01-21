@@ -559,7 +559,7 @@ export function createEmptyProduct(id: string): Product {
     id,
     name: "",
     unitPrice: 0,
-    currency: "CNY",  // 기본값: 중국 위안화 (중국 공장이 대부분)
+    currency: "USD",  // 기본값: 미국 달러
     quantity: 0,
     dimensions: { width: 10, height: 10, depth: 10 },
     hsCode: DEFAULT_HS_CODE,  // 기본값: 봉제 인형

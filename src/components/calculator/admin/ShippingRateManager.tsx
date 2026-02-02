@@ -608,15 +608,26 @@ export function ShippingRateManager() {
       }
       // Delete 또는 Backspace: 선택된 셀/행 삭제
       if (e.key === "Delete" || e.key === "Backspace") {
-        // Input에 포커스가 있으면 기본 동작 사용
-        if (document.activeElement?.tagName === "INPUT") return
-        e.preventDefault()
-        // 행 선택이 있으면 행 삭제, 셀 선택이 있으면 셀 삭제
+        // 행 선택이 있으면 행 삭제
         if (selectedRowIndices.size > 0) {
+          e.preventDefault()
           handleDeleteSelectedRows()
-        } else {
-          handleDeleteSelectedCells()
+          return
         }
+
+        // 여러 셀이 선택된 경우 (드래그 선택) - input 포커스 무시하고 전체 삭제
+        if (selectedCells.size > 1) {
+          e.preventDefault()
+          handleDeleteSelectedCells()
+          return
+        }
+
+        // 단일 셀이고 Input에 포커스가 있으면 기본 동작 사용 (글자 삭제)
+        if (document.activeElement?.tagName === "INPUT") return
+
+        // 그 외 셀 삭제
+        e.preventDefault()
+        handleDeleteSelectedCells()
       }
       // Ctrl+A: 전체 행 선택
       if (e.ctrlKey && e.key === "a") {

@@ -5,7 +5,7 @@ import { Plus, Trash2, Pencil, Check, X, Upload, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import * as XLSX from "xlsx"
+import ExcelJS from "exceljs"
 import {
   Select,
   SelectContent,
@@ -439,84 +439,123 @@ export function ShippingRateManager() {
   }, [selectedRowIndices, tableRows, removeRate])
 
   // 엑셀 템플릿 다운로드
-  const handleDownloadTemplate = useCallback(() => {
-    // 샘플 데이터가 포함된 템플릿 생성
-    const templateData = [
-      { CBM: 0.5, "요금": 85 },
-      { CBM: 1, "요금": 110 },
-      { CBM: 1.5, "요금": 130 },
-      { CBM: 2, "요금": 150 },
+  // ExcelJS는 브라우저에서 buffer로 만든 뒤 Blob → 다운로드 링크를 생성
+  const handleDownloadTemplate = useCallback(async () => {
+    // 워크북(엑셀 파일) 생성
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet("운임요금")
+
+    // 헤더 행 추가
+    ws.columns = [
+      { header: "CBM", key: "cbm", width: 10 },
+      { header: "요금", key: "rate", width: 15 },
     ]
 
-    const ws = XLSX.utils.json_to_sheet(templateData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "운임요금")
+    // 샘플 데이터 추가
+    ws.addRows([
+      { cbm: 0.5, rate: 85 },
+      { cbm: 1, rate: 110 },
+      { cbm: 1.5, rate: 130 },
+      { cbm: 2, rate: 150 },
+    ])
 
-    // 열 너비 설정
-    ws["!cols"] = [{ wch: 10 }, { wch: 15 }]
-
-    XLSX.writeFile(wb, "운임요금_템플릿.xlsx")
+    // buffer로 변환 후 브라우저에서 다운로드
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "운임요금_템플릿.xlsx"
+    a.click()
+    // 메모리 해제 (다운로드 후 URL 객체 정리)
+    URL.revokeObjectURL(url)
   }, [])
 
   // 엑셀 파일 업로드 처리
+  // ExcelJS는 ArrayBuffer를 load()로 읽은 뒤 워크시트의 각 행을 순회
   const handleExcelUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !selectedRateTypeId) return
 
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: "array" })
-        const sheetName = workbook.SheetNames[0]
-        const sheet = workbook.Sheets[sheetName]
-        const jsonData = XLSX.utils.sheet_to_json<{ CBM?: number; cbm?: number; "요금"?: number; rate?: number }>(sheet)
+    try {
+      // 파일을 ArrayBuffer로 읽기
+      const arrayBuffer = await file.arrayBuffer()
 
-        // 파싱된 데이터로 행 추가
-        const newRows: TableRow[] = [...tableRows.filter((r) => r.id !== null)] // 기존 데이터만 유지
+      // ExcelJS로 워크북 로드
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.load(arrayBuffer)
 
-        for (const row of jsonData) {
-          const cbm = row.CBM ?? row.cbm
-          const rate = row["요금"] ?? row.rate
-
-          if (cbm !== undefined && rate !== undefined) {
-            // 새 행으로 추가
-            newRows.push({
-              id: null,
-              cbm: cleanNumber(String(cbm)),
-              rate: cleanNumber(String(rate)),
-            })
-          }
-        }
-
-        // 빈 행 2개 추가
-        newRows.push({ id: null, cbm: "", rate: "" })
-        newRows.push({ id: null, cbm: "", rate: "" })
-
-        setTableRows(newRows)
-
-        // 새로 추가된 데이터 저장
-        for (const row of jsonData) {
-          const cbm = row.CBM ?? row.cbm
-          const rate = row["요금"] ?? row.rate
-
-          if (cbm !== undefined && rate !== undefined && cbm > 0 && rate >= 0) {
-            await createRate({
-              rateTypeId: selectedRateTypeId,
-              cbm: Number(cbm),
-              rate: Number(rate),
-            })
-          }
-        }
-
-        alert(`${jsonData.length}개의 요금이 업로드되었습니다.`)
-      } catch (error) {
-        console.error("엑셀 파싱 오류:", error)
-        alert("엑셀 파일을 읽는 중 오류가 발생했습니다.")
+      // 첫 번째 워크시트 가져오기
+      const worksheet = workbook.worksheets[0]
+      if (!worksheet) {
+        alert("워크시트를 찾을 수 없습니다.")
+        return
       }
-    }
 
-    reader.readAsArrayBuffer(file)
+      // 헤더 행(1행) 읽기 → 컬럼 인덱스 매핑
+      const headerRow = worksheet.getRow(1)
+      let cbmColIndex = -1
+      let rateColIndex = -1
+
+      headerRow.eachCell((cell, colNumber) => {
+        const value = String(cell.value ?? "").trim().toLowerCase()
+        if (value === "cbm") cbmColIndex = colNumber
+        if (value === "요금" || value === "rate") rateColIndex = colNumber
+      })
+
+      // 헤더를 못 찾으면 기본값 (1열=CBM, 2열=요금)
+      if (cbmColIndex === -1) cbmColIndex = 1
+      if (rateColIndex === -1) rateColIndex = 2
+
+      // 데이터 행 파싱 (2행부터)
+      const parsedData: { cbm: number; rate: number }[] = []
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return // 헤더 건너뛰기
+
+        const cbmRaw = row.getCell(cbmColIndex).value
+        const rateRaw = row.getCell(rateColIndex).value
+
+        const cbm = Number(cbmRaw)
+        const rate = Number(rateRaw)
+
+        if (!isNaN(cbm) && !isNaN(rate) && cbm > 0 && rate >= 0) {
+          parsedData.push({ cbm, rate })
+        }
+      })
+
+      // 파싱된 데이터로 행 추가
+      const newRows: TableRow[] = [...tableRows.filter((r) => r.id !== null)]
+
+      for (const row of parsedData) {
+        newRows.push({
+          id: null,
+          cbm: String(row.cbm),
+          rate: String(row.rate),
+        })
+      }
+
+      // 빈 행 2개 추가
+      newRows.push({ id: null, cbm: "", rate: "" })
+      newRows.push({ id: null, cbm: "", rate: "" })
+
+      setTableRows(newRows)
+
+      // 새로 추가된 데이터 저장
+      for (const row of parsedData) {
+        await createRate({
+          rateTypeId: selectedRateTypeId,
+          cbm: row.cbm,
+          rate: row.rate,
+        })
+      }
+
+      alert(`${parsedData.length}개의 요금이 업로드되었습니다.`)
+    } catch (error) {
+      console.error("엑셀 파싱 오류:", error)
+      alert("엑셀 파일을 읽는 중 오류가 발생했습니다.")
+    }
 
     // input 초기화 (같은 파일 다시 선택 가능하게)
     e.target.value = ""

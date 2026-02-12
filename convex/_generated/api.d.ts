@@ -9,6 +9,7 @@
  */
 
 import type * as companyCosts from "../companyCosts.js";
+import type * as companyWarehouses from "../companyWarehouses.js";
 import type * as costSettings from "../costSettings.js";
 import type * as factories from "../factories.js";
 import type * as factoryCostItems from "../factoryCostItems.js";
@@ -26,6 +27,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   companyCosts: typeof companyCosts;
+  companyWarehouses: typeof companyWarehouses;
   costSettings: typeof costSettings;
   factories: typeof factories;
   factoryCostItems: typeof factoryCostItems;

@@ -113,29 +113,36 @@ export interface ShippingRateTable {
 }
 
 // 국제 운송료 계산 (테이블 기반)
+// 📌 비유: 택시 요금표에서 거리에 해당하는 요금을 찾는 것
+//    CBM(부피)이면 부피 기준, KG(중량)이면 무게 기준으로 조회
 export function findShippingRate(
   rates: ShippingRateTable[],
-  targetCbm: number
+  targetValue: number,
+  unitType: "cbm" | "kg" = "cbm"
 ): InternationalShippingResult | null {
   if (rates.length === 0) return null
 
-  // CBM을 0.5 단위로 올림
-  const roundedCbm = Math.ceil(targetCbm * 2) / 2
+  // 단위 타입에 따라 올림 방식 결정
+  // CBM: 0.5 단위 올림 (예: 0.7 → 1.0)
+  // KG: 1kg 단위 올림 (예: 45.3 → 46)
+  const roundedValue = unitType === "cbm"
+    ? Math.ceil(targetValue * 2) / 2
+    : Math.ceil(targetValue)
 
   // 정렬된 요금표
   const sortedRates = [...rates].sort((a, b) => a.cbm - b.cbm)
 
   // 정확히 일치하는 값 찾기
-  const exactMatch = sortedRates.find((r) => r.cbm === roundedCbm)
+  const exactMatch = sortedRates.find((r) => r.cbm === roundedValue)
   if (exactMatch) {
     return {
-      cbm: roundedCbm,
+      cbm: roundedValue,
       rate: exactMatch.rate,
     }
   }
 
   // 범위 내에서 가장 가까운 상위 값 찾기
-  const upperMatch = sortedRates.find((r) => r.cbm >= roundedCbm)
+  const upperMatch = sortedRates.find((r) => r.cbm >= roundedValue)
   if (upperMatch) {
     return {
       cbm: upperMatch.cbm,
@@ -148,7 +155,7 @@ export function findShippingRate(
   const unitRate = lastRate.rate / lastRate.cbm
 
   return {
-    cbm: roundedCbm,
-    rate: Math.round(unitRate * roundedCbm * 100) / 100,
+    cbm: roundedValue,
+    rate: Math.round(unitRate * roundedValue * 100) / 100,
   }
 }

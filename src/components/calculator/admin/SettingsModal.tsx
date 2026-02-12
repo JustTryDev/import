@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building2, Truck, DollarSign, Factory, Bookmark, Calculator } from "lucide-react"
+import { Truck, Factory, Bookmark, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,15 +18,13 @@ import {
 import { useSeedData } from "@/hooks"
 
 // 관리 컴포넌트들
-import { ShippingCompanyManager } from "./ShippingCompanyManager"
-import { ShippingRateManager } from "./ShippingRateManager"
-import { CompanyCostManager } from "./CompanyCostManager"
+import { ShippingManager } from "./ShippingManager"
 import { FactoryManager } from "./FactoryManager"
 import { PresetManager } from "./PresetManager"
 import { CostSettingsManager } from "./CostSettingsManager"
 
-// 탭 타입
-type SettingsTab = "companies" | "rates" | "companyCosts" | "factories" | "presets" | "costSettings"
+// 탭 타입 (3개 탭을 "shipping" 하나로 통합)
+type SettingsTab = "shipping" | "factories" | "presets" | "costSettings"
 
 interface SettingsModalProps {
   open: boolean
@@ -38,7 +36,7 @@ interface SettingsModalProps {
 export function SettingsModal({
   open,
   onOpenChange,
-  defaultTab = "companies",
+  defaultTab = "shipping",
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab)
   const { seedAll, isSeeding } = useSeedData()
@@ -86,18 +84,10 @@ export function SettingsModal({
           onValueChange={(v) => setActiveTab(v as SettingsTab)}
           className="flex-1 flex flex-col min-h-0"
         >
-          <TabsList className="grid grid-cols-6 w-full">
-            <TabsTrigger value="companies" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">운송 업체</span>
-            </TabsTrigger>
-            <TabsTrigger value="rates" className="flex items-center gap-2">
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="shipping" className="flex items-center gap-2">
               <Truck className="h-4 w-4" />
-              <span className="hidden sm:inline">운임 요금</span>
-            </TabsTrigger>
-            <TabsTrigger value="companyCosts" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              <span className="hidden sm:inline">공통 비용</span>
+              <span className="hidden sm:inline">운송 관리</span>
             </TabsTrigger>
             <TabsTrigger value="factories" className="flex items-center gap-2">
               <Factory className="h-4 w-4" />
@@ -115,19 +105,9 @@ export function SettingsModal({
 
           {/* 스크롤 가능한 컨텐츠 영역 */}
           <div className="flex-1 overflow-y-auto mt-4 pr-1">
-            {/* 운송 업체 관리 */}
-            <TabsContent value="companies" className="mt-0">
-              <ShippingCompanyManager />
-            </TabsContent>
-
-            {/* 운임 요금 관리 */}
-            <TabsContent value="rates" className="mt-0">
-              <ShippingRateManager />
-            </TabsContent>
-
-            {/* 업체별 공통 비용 관리 */}
-            <TabsContent value="companyCosts" className="mt-0">
-              <CompanyCostManager />
+            {/* 운송 관리 (업체 + 창고 + 운임 요금 + 공통 비용 통합) */}
+            <TabsContent value="shipping" className="mt-0">
+              <ShippingManager />
             </TabsContent>
 
             {/* 중국 공장 관리 */}

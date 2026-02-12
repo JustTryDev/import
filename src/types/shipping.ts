@@ -65,12 +65,16 @@ export interface ShippingCompany {
 }
 
 // 운임 타입 (할인운임제, 일반운임제, 평균요금제 등)
+// 📌 운임 타입은 배송지(창고) 단위로 관리됩니다.
+//    같은 업체라도 창고마다 다른 요금표를 가질 수 있습니다.
 export interface ShippingRateType {
   _id: Id<"shippingRateTypes">
-  companyId: Id<"shippingCompanies">
+  companyId?: Id<"shippingCompanies">     // 레거시 호환 (마이그레이션 후 제거 예정)
+  warehouseId?: Id<"companyWarehouses">   // 배송지(창고) ID — 운임의 실제 기준
   name: string
   description?: string
   currency?: "USD" | "CNY" | "KRW"  // 운임 타입별 통화 (기본값: USD)
+  unitType?: "cbm" | "kg"           // 요금 단위 (기본값: "cbm")
   isDefault: boolean
   sortOrder: number
   createdAt: number

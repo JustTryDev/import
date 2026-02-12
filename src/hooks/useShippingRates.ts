@@ -5,11 +5,12 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import { Id } from "../../convex/_generated/dataModel"
 
-// 운임 타입 관련 훅
-export function useShippingRateTypes(companyId: Id<"shippingCompanies"> | null) {
+// 운임 타입 관련 훅 (배송지(창고) 기반)
+// 📌 비유: 특정 물류센터의 요금제 목록을 가져오는 것
+export function useShippingRateTypes(warehouseId: Id<"companyWarehouses"> | null) {
   const rateTypes = useQuery(
-    api.shippingRateTypes.listByCompany,
-    companyId ? { companyId } : "skip"
+    api.shippingRateTypes.listByWarehouse,
+    warehouseId ? { warehouseId } : "skip"
   )
 
   const createRateType = useMutation(api.shippingRateTypes.create)
@@ -24,7 +25,10 @@ export function useShippingRateTypes(companyId: Id<"shippingCompanies"> | null) 
   return {
     rateTypes,
     defaultRateType,
-    isLoading: rateTypes === undefined,
+    // 📌 핵심: 쿼리가 skip된 상태(warehouseId가 null)는 "로딩 중"이 아님
+    //    "아직 창고를 안 골랐으니 데이터가 없는 게 정상"이라는 뜻
+    //    이걸 true로 두면 다른 드롭다운까지 비활성화되는 순환 의존성 발생
+    isLoading: warehouseId ? rateTypes === undefined : false,
     createRateType,
     updateRateType,
     removeRateType,

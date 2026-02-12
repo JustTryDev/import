@@ -24,13 +24,12 @@
       "WebFetch(domain:github.com)",
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Skill(multi-ai)"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "chrome-devtools",
-    "context7",
     "convex"
   ]
 }

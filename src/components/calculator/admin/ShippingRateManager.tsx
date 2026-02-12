@@ -17,6 +17,7 @@ import {
   useShippingCompanies,
   useShippingRateTypes,
   useShippingRates,
+  useCompanyWarehouses,
 } from "@/hooks"
 import { Id } from "../../../../convex/_generated/dataModel"
 
@@ -66,15 +67,20 @@ function getSelectedRange(start: CellPosition, end: CellPosition): Set<string> {
 export function ShippingRateManager() {
   const { companies, isLoading: companiesLoading } = useShippingCompanies()
   const [selectedCompanyId, setSelectedCompanyId] = useState<Id<"shippingCompanies"> | null>(null)
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<Id<"companyWarehouses"> | null>(null)
   const [selectedRateTypeId, setSelectedRateTypeId] = useState<Id<"shippingRateTypes"> | null>(null)
 
+  // 배송지(창고) 목록
+  const { warehouses, isLoading: warehousesLoading } = useCompanyWarehouses(selectedCompanyId)
+
+  // 운임 타입은 창고(배송지) 기반으로 조회
   const {
     rateTypes,
     isLoading: rateTypesLoading,
     createRateType,
     updateRateType,
     removeRateType,
-  } = useShippingRateTypes(selectedCompanyId)
+  } = useShippingRateTypes(selectedWarehouseId)
 
   const {
     rates,
@@ -89,6 +95,7 @@ export function ShippingRateManager() {
   const [isAddingType, setIsAddingType] = useState(false)
   const [newTypeName, setNewTypeName] = useState("")
   const [newTypeCurrency, setNewTypeCurrency] = useState<"USD" | "CNY" | "KRW">("USD")
+  const [newTypeUnitType, setNewTypeUnitType] = useState<"cbm" | "kg">("cbm")
 
   // 운임 타입 편집 상태
   const [editingTypeId, setEditingTypeId] = useState<Id<"shippingRateTypes"> | null>(null)
@@ -121,6 +128,13 @@ export function ShippingRateManager() {
     }
   }, [companies, selectedCompanyId])
 
+  // 첫 번째 창고 자동 선택
+  useEffect(() => {
+    if (warehouses && warehouses.length > 0 && !selectedWarehouseId) {
+      setSelectedWarehouseId(warehouses[0]._id)
+    }
+  }, [warehouses, selectedWarehouseId])
+
   // 첫 번째 운임 타입 자동 선택
   useEffect(() => {
     if (rateTypes && rateTypes.length > 0 && !selectedRateTypeId) {
@@ -128,10 +142,16 @@ export function ShippingRateManager() {
     }
   }, [rateTypes, selectedRateTypeId])
 
-  // 업체 변경 시 운임 타입 초기화
+  // 업체 변경 시 창고, 운임 타입 초기화
   useEffect(() => {
+    setSelectedWarehouseId(null)
     setSelectedRateTypeId(null)
   }, [selectedCompanyId])
+
+  // 창고 변경 시 운임 타입 초기화
+  useEffect(() => {
+    setSelectedRateTypeId(null)
+  }, [selectedWarehouseId])
 
   // rates 데이터가 변경되면 tableRows 동기화
   // 기존 데이터를 Input용 문자열로 변환하고, 빈 행 2개 추가
@@ -162,18 +182,20 @@ export function ShippingRateManager() {
     setTableRows([...existingRows, ...emptyRows])
   }, [rates])
 
-  // 운임 타입 추가
+  // 운임 타입 추가 (배송지 기반)
   const handleAddRateType = async () => {
-    if (!selectedCompanyId || !newTypeName.trim()) return
+    if (!selectedWarehouseId || !newTypeName.trim()) return
     await createRateType({
-      companyId: selectedCompanyId,
+      warehouseId: selectedWarehouseId,
       name: newTypeName.trim(),
       currency: newTypeCurrency,
+      unitType: newTypeUnitType,
       isDefault: false,
       sortOrder: (rateTypes?.length ?? 0) + 1,
     })
     setNewTypeName("")
     setNewTypeCurrency("USD")
+    setNewTypeUnitType("cbm")
     setIsAddingType(false)
   }
 
@@ -829,27 +851,52 @@ export function ShippingRateManager() {
 
   return (
     <div className="space-y-4">
-      {/* 업체 선택 */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <Label className="text-sm text-gray-500">운송 업체 선택</Label>
-        <Select
-          value={selectedCompanyId ?? undefined}
-          onValueChange={(v) => setSelectedCompanyId(v as Id<"shippingCompanies">)}
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue placeholder="업체를 선택하세요" />
-          </SelectTrigger>
-          <SelectContent>
-            {companies?.map((company) => (
-              <SelectItem key={company._id} value={company._id}>
-                {company.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* 업체 + 배송지 선택 */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+        <div>
+          <Label className="text-sm text-gray-500">운송 업체 선택</Label>
+          <Select
+            value={selectedCompanyId ?? undefined}
+            onValueChange={(v) => setSelectedCompanyId(v as Id<"shippingCompanies">)}
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="업체를 선택하세요" />
+            </SelectTrigger>
+            <SelectContent>
+              {companies?.map((company) => (
+                <SelectItem key={company._id} value={company._id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 배송지(창고) 선택 */}
+        {selectedCompanyId && warehouses && warehouses.length > 0 && (
+          <div>
+            <Label className="text-sm text-gray-500">배송지 (창고)</Label>
+            <Select
+              value={selectedWarehouseId ?? undefined}
+              onValueChange={(v) => setSelectedWarehouseId(v as Id<"companyWarehouses">)}
+              disabled={warehousesLoading}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="배송지를 선택하세요" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((wh) => (
+                  <SelectItem key={wh._id} value={wh._id}>
+                    {wh.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      {selectedCompanyId && (
+      {selectedWarehouseId && (
         <>
           {/* 운임 타입 관리 */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -887,6 +934,19 @@ export function ShippingRateManager() {
                     <SelectItem value="KRW">KRW (₩)</SelectItem>
                   </SelectContent>
                 </Select>
+                {/* 단위 타입 선택 (CBM/KG) */}
+                <Select
+                  value={newTypeUnitType}
+                  onValueChange={(v) => setNewTypeUnitType(v as "cbm" | "kg")}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cbm">CBM</SelectItem>
+                    <SelectItem value="kg">KG</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" onClick={handleAddRateType}>
                   추가
                 </Button>
@@ -897,6 +957,7 @@ export function ShippingRateManager() {
                     setIsAddingType(false)
                     setNewTypeName("")
                     setNewTypeCurrency("USD")
+                    setNewTypeUnitType("cbm")
                   }}
                 >
                   취소
@@ -967,7 +1028,15 @@ export function ShippingRateManager() {
                           {type.name}
                           {/* 통화 표시 */}
                           <span className="ml-1 opacity-70">
-                            ({(type as { currency?: string }).currency ?? "USD"})
+                            ({type.currency ?? "USD"})
+                          </span>
+                          {/* 단위 타입 배지 */}
+                          <span className={`ml-1 text-[10px] px-1 py-0.5 rounded ${
+                            type.unitType === "kg"
+                              ? "bg-orange-100 text-orange-600"
+                              : "bg-blue-100 text-blue-600"
+                          }`}>
+                            {type.unitType === "kg" ? "KG" : "CBM"}
                           </span>
                           {type.isDefault && " (기본)"}
                         </button>
@@ -975,7 +1044,7 @@ export function ShippingRateManager() {
                           onClick={() => handleStartEditType(
                             type._id,
                             type.name,
-                            (type as { currency?: "USD" | "CNY" | "KRW" }).currency
+                            type.currency
                           )}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
                           title="이름/통화 변경"
@@ -994,8 +1063,10 @@ export function ShippingRateManager() {
           {selectedRateTypeId && (() => {
             // 선택된 운임 타입의 통화 가져오기
             const selectedType = rateTypes?.find((t) => t._id === selectedRateTypeId)
-            const currency = (selectedType as { currency?: string })?.currency ?? "USD"
+            const currency = selectedType?.currency ?? "USD"
             const currencySymbol = currency === "USD" ? "$" : currency === "CNY" ? "¥" : "₩"
+            const unitType = selectedType?.unitType ?? "cbm"
+            const unitLabel = unitType === "kg" ? "KG" : "CBM"
 
             return (
               <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -1069,7 +1140,7 @@ export function ShippingRateManager() {
                               {/* 행 번호 열 헤더 */}
                             </th>
                             <th className="bg-gray-100 border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium w-32">
-                              CBM
+                              {unitLabel}
                             </th>
                             <th className="bg-gray-100 border border-gray-300 py-1.5 px-2 text-center text-gray-600 font-medium">
                               요금 ({currencySymbol})

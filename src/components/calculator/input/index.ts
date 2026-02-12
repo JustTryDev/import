@@ -4,7 +4,6 @@
 
 export { ProductInfoInput } from "./ProductInfoInput"
 export { DimensionsInput } from "./DimensionsInput"
-export { ShippingCompanySelector } from "./ShippingCompanySelector"
 export { AdditionalCostInput } from "./AdditionalCostInput"
 export { CompanyCostSelector } from "./CompanyCostSelector"
 export { TariffRateInput } from "./TariffRateInput"

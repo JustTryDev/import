@@ -24,6 +24,7 @@ import {
 } from "@/lib/calculations"
 import {
   useShippingCompanies,
+  useCompanyWarehouses,
   useShippingRateTypes,
   useShippingRates,
   useCostSettings,
@@ -86,8 +87,12 @@ export function PackagingCalculatorModal({
   const { companies } = useShippingCompanies()
   const [selectedCompanyId, setSelectedCompanyId] = useState<Id<"shippingCompanies"> | null>(null)
 
-  // 운임 타입
-  const { rateTypes, defaultRateType } = useShippingRateTypes(selectedCompanyId)
+  // 배송지(창고) - 업체 선택 후 해당 업체의 창고 목록 조회
+  const { warehouses } = useCompanyWarehouses(selectedCompanyId)
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<Id<"companyWarehouses"> | null>(null)
+
+  // 운임 타입 (창고 기반으로 조회)
+  const { rateTypes, defaultRateType } = useShippingRateTypes(selectedWarehouseId)
   const [selectedRateTypeId, setSelectedRateTypeId] = useState<Id<"shippingRateTypes"> | null>(null)
 
   // 운송료 테이블
@@ -112,6 +117,13 @@ export function PackagingCalculatorModal({
     }
   }, [companies, selectedCompanyId])
 
+  // 첫 번째 창고 자동 선택
+  useEffect(() => {
+    if (warehouses && warehouses.length > 0 && !selectedWarehouseId) {
+      setSelectedWarehouseId(warehouses[0]._id)
+    }
+  }, [warehouses, selectedWarehouseId])
+
   // 기본 운임 타입 자동 선택
   useEffect(() => {
     if (defaultRateType && !selectedRateTypeId) {
@@ -121,9 +133,16 @@ export function PackagingCalculatorModal({
     }
   }, [rateTypes, defaultRateType, selectedRateTypeId])
 
-  // 업체 변경 시 운임 타입 초기화
+  // 업체 변경 시 창고 + 운임 타입 초기화
   const handleCompanyChange = (companyId: string) => {
     setSelectedCompanyId(companyId as Id<"shippingCompanies">)
+    setSelectedWarehouseId(null)
+    setSelectedRateTypeId(null)
+  }
+
+  // 창고 변경 시 운임 타입 초기화
+  const handleWarehouseChange = (warehouseId: string) => {
+    setSelectedWarehouseId(warehouseId as Id<"companyWarehouses">)
     setSelectedRateTypeId(null)
   }
 
@@ -495,8 +514,8 @@ export function PackagingCalculatorModal({
             )}
           </AnimatePresence>
 
-          {/* 운송 업체 / 운임 타입 선택 */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* 운송 업체 / 배송지 / 운임 타입 선택 */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="text-xs text-gray-500">운송 업체</Label>
               <Select
@@ -516,11 +535,30 @@ export function PackagingCalculatorModal({
               </Select>
             </div>
             <div>
+              <Label className="text-xs text-gray-500">배송지</Label>
+              <Select
+                value={selectedWarehouseId ?? undefined}
+                onValueChange={handleWarehouseChange}
+                disabled={!selectedCompanyId || !warehouses?.length}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="배송지 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses?.map((wh) => (
+                    <SelectItem key={wh._id} value={wh._id}>
+                      {wh.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label className="text-xs text-gray-500">운임 타입</Label>
               <Select
                 value={selectedRateTypeId ?? undefined}
                 onValueChange={(v) => setSelectedRateTypeId(v as Id<"shippingRateTypes">)}
-                disabled={!selectedCompanyId || !rateTypes?.length}
+                disabled={!selectedWarehouseId || !rateTypes?.length}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="운임 타입 선택" />

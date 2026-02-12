@@ -14,6 +14,7 @@ import type * as costSettings from "../costSettings.js";
 import type * as factories from "../factories.js";
 import type * as factoryCostItems from "../factoryCostItems.js";
 import type * as factoryPresets from "../factoryPresets.js";
+import type * as migrations from "../migrations.js";
 import type * as seed from "../seed.js";
 import type * as shippingCompanies from "../shippingCompanies.js";
 import type * as shippingRateTypes from "../shippingRateTypes.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   factories: typeof factories;
   factoryCostItems: typeof factoryCostItems;
   factoryPresets: typeof factoryPresets;
+  migrations: typeof migrations;
   seed: typeof seed;
   shippingCompanies: typeof shippingCompanies;
   shippingRateTypes: typeof shippingRateTypes;

@@ -28,7 +28,6 @@ import {
 
 // 입력 컴포넌트
 import {
-  ShippingCompanySelector,
   AdditionalCostInput,
   CompanyCostSelector,
   ProductList,
@@ -73,8 +72,19 @@ export function ImportCalculator() {
   const { companies, isLoading: companiesLoading } = useShippingCompanies()
   const [selectedCompanyId, setSelectedCompanyId] = useState<Id<"shippingCompanies"> | null>(null)
 
-  // 운임 타입
-  const { rateTypes, defaultRateType, isLoading: rateTypesLoading } = useShippingRateTypes(selectedCompanyId)
+  // ===== 운송 경로 (출발지/도착지) =====
+  // 📌 비유: 택배 보낼 때 "어디서 → 어디로" 정하는 것
+  //    출발지 = 중국 공장, 도착지 = 업체의 창고(배송지)
+  const { warehouses, isLoading: warehousesLoading } = useCompanyWarehouses(selectedCompanyId)
+  const [selectedRouteFactoryId, setSelectedRouteFactoryId] = useState<string | null>(null)
+  const [selectedRouteWarehouseId, setSelectedRouteWarehouseId] = useState<string | null>(null)
+
+  // ===== 운임 타입 (창고 기반) =====
+  // 📌 핵심: 운임은 업체가 아니라 "어떤 창고로 보내느냐"에 따라 달라짐
+  //    같은 고포트라도 위해 창고와 광저우 창고는 요금이 다름
+  const { rateTypes, defaultRateType, isLoading: rateTypesLoading } = useShippingRateTypes(
+    selectedRouteWarehouseId as Id<"companyWarehouses"> | null
+  )
   const [selectedRateTypeId, setSelectedRateTypeId] = useState<Id<"shippingRateTypes"> | null>(null)
 
   // 운송료 테이블
@@ -83,11 +93,6 @@ export function ImportCalculator() {
   // ===== 중국 공장 =====
   const { factories, isLoading: factoriesLoading } = useFactories()
   const { costItemsMap: factoryCostItemsMap, isLoading: factoryCostItemsLoading } = useAllFactoryCostItems()
-
-  // ===== 운송 경로 (출발지/도착지) =====
-  const { warehouses, isLoading: warehousesLoading } = useCompanyWarehouses(selectedCompanyId)
-  const [selectedRouteFactoryId, setSelectedRouteFactoryId] = useState<string | null>(null)
-  const [selectedRouteWarehouseId, setSelectedRouteWarehouseId] = useState<string | null>(null)
 
   // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL) =====
   const { inlandConfig, domesticConfig, threePLConfig } = useCostSettings()
@@ -112,22 +117,46 @@ export function ImportCalculator() {
 
   // ===== 설정 모달 =====
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsTab, setSettingsTab] = useState<"companies" | "rates" | "companyCosts" | "factories">("companies")
+  const [settingsTab, setSettingsTab] = useState<"shipping" | "factories" | "presets" | "costSettings">("shipping")
 
   // ===== 자동 선택 로직 =====
-  // 첫 번째 업체 자동 선택
+  // 📌 기본값: 고포트 → 위해 LCL → 평균 / 출발지: Dixin Toys
+
+  // 업체 자동 선택 (고포트 우선, 없으면 첫 번째)
   useEffect(() => {
     if (companies && companies.length > 0 && !selectedCompanyId) {
-      setSelectedCompanyId(companies[0]._id)
+      const goport = companies.find((c) => c.name === "고포트")
+      setSelectedCompanyId(goport ? goport._id : companies[0]._id)
     }
   }, [companies, selectedCompanyId])
 
-  // 기본 운임 타입 자동 선택
+  // 출발지(공장) 자동 선택 (Dixin Toys 우선, 없으면 첫 번째)
   useEffect(() => {
-    if (defaultRateType && !selectedRateTypeId) {
-      setSelectedRateTypeId(defaultRateType._id)
-    } else if (rateTypes && rateTypes.length > 0 && !selectedRateTypeId) {
-      setSelectedRateTypeId(rateTypes[0]._id)
+    if (factories && factories.length > 0 && !selectedRouteFactoryId) {
+      const dixinToys = factories.find((f) => f.name === "Dixin Toys")
+      setSelectedRouteFactoryId(dixinToys ? dixinToys._id : factories[0]._id)
+    }
+  }, [factories, selectedRouteFactoryId])
+
+  // 도착지(창고) 자동 선택 (위해 LCL 우선, 없으면 첫 번째)
+  useEffect(() => {
+    if (warehouses && warehouses.length > 0 && !selectedRouteWarehouseId) {
+      const weihai = warehouses.find((w) => w.name.includes("위해"))
+      setSelectedRouteWarehouseId(weihai ? weihai._id : warehouses[0]._id)
+    }
+  }, [warehouses, selectedRouteWarehouseId])
+
+  // 운임 타입 자동 선택 (평균 우선 → isDefault → 첫 번째)
+  useEffect(() => {
+    if (rateTypes && rateTypes.length > 0 && !selectedRateTypeId) {
+      const average = rateTypes.find((rt) => rt.name === "평균")
+      if (average) {
+        setSelectedRateTypeId(average._id)
+      } else if (defaultRateType) {
+        setSelectedRateTypeId(defaultRateType._id)
+      } else {
+        setSelectedRateTypeId(rateTypes[0]._id)
+      }
     }
   }, [rateTypes, defaultRateType, selectedRateTypeId])
 
@@ -136,6 +165,12 @@ export function ImportCalculator() {
     setSelectedCompanyCostIds([])
     setSelectedRouteWarehouseId(null)
   }, [selectedCompanyId])
+
+  // 창고(배송지) 변경 시 운임 타입 초기화
+  // 📌 비유: 물류센터를 바꾸면 이전 센터의 요금제가 아닌 새 센터의 요금제를 봐야 함
+  useEffect(() => {
+    setSelectedRateTypeId(null)
+  }, [selectedRouteWarehouseId])
 
   // 필수 공통 비용 자동 선택
   useEffect(() => {
@@ -223,9 +258,10 @@ export function ImportCalculator() {
         }))
       : []
 
-    // 선택된 운임 타입의 통화 가져오기
+    // 선택된 운임 타입의 통화 및 단위 가져오기
     const selectedRateType = rateTypes?.find((rt) => rt._id === selectedRateTypeId)
     const rateTypeCurrency = (selectedRateType?.currency ?? "USD") as "USD" | "CNY" | "KRW"
+    const rateTypeUnitType = (selectedRateType?.unitType ?? "cbm") as "cbm" | "kg"
 
     // 공장 슬롯 변환 (다중 제품용)
     // 📌 현재는 linkedProductIds가 없으므로 모든 제품에 연결
@@ -285,6 +321,7 @@ export function ImportCalculator() {
       factorySlots: factorySlotInputs,
       shippingRates: rateTable,
       rateTypeCurrency,
+      rateTypeUnitType,
       companyCosts,
       orderCount,
       costSettings: {
@@ -313,7 +350,7 @@ export function ImportCalculator() {
 
   // 설정 모달 열기
   const handleSettingsClick = useCallback(() => {
-    setSettingsTab("companies")
+    setSettingsTab("shipping")
     setSettingsOpen(true)
   }, [])
 
@@ -415,20 +452,26 @@ export function ImportCalculator() {
               />
             </motion.div>
 
-            {/* 2. 운송 경로 (출발지/도착지) */}
+            {/* 2. 운송 경로 (업체 → 도착지 → 운임 타입 → 출발지 통합) */}
             <motion.div
               variants={itemVariants}
               className="bg-white rounded-lg border border-gray-200 p-3"
             >
               <RouteSelector
+                companies={companies}
+                selectedCompanyId={selectedCompanyId}
+                onCompanyChange={setSelectedCompanyId}
                 factories={factories}
                 selectedFactoryId={selectedRouteFactoryId}
                 onFactoryChange={setSelectedRouteFactoryId}
                 warehouses={warehouses}
                 selectedWarehouseId={selectedRouteWarehouseId}
                 onWarehouseChange={setSelectedRouteWarehouseId}
-                companyName={companies?.find((c) => c._id === selectedCompanyId)?.name}
-                isLoading={factoriesLoading || warehousesLoading}
+                rateTypes={rateTypes}
+                selectedRateTypeId={selectedRateTypeId}
+                onRateTypeChange={setSelectedRateTypeId}
+                onSettingsClick={handleSettingsClick}
+                isLoading={factoriesLoading || warehousesLoading || companiesLoading || rateTypesLoading}
               />
             </motion.div>
 
@@ -466,30 +509,19 @@ export function ImportCalculator() {
               />
             </motion.div>
 
-            {/* 5. [국제 운송 회사] [업체별 공통 비용] - 2열 그리드 */}
-            <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                <ShippingCompanySelector
-                  companies={companies}
-                  selectedCompanyId={selectedCompanyId}
-                  setSelectedCompanyId={setSelectedCompanyId}
-                  rateTypes={rateTypes}
-                  selectedRateTypeId={selectedRateTypeId}
-                  setSelectedRateTypeId={setSelectedRateTypeId}
-                  onSettingsClick={handleSettingsClick}
-                  isLoading={companiesLoading || rateTypesLoading}
-                />
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                <CompanyCostSelector
-                  items={companyCostItems}
-                  selectedIds={selectedCompanyCostIds}
-                  setSelectedIds={setSelectedCompanyCostIds}
-                  orderCount={orderCount}
-                  setOrderCount={handleOrderCountChange}
-                  isLoading={companyCostsLoading}
-                />
-              </div>
+            {/* 5. 업체별 공통 비용 */}
+            <motion.div
+              variants={itemVariants}
+              className="bg-white rounded-lg border border-gray-200 p-3"
+            >
+              <CompanyCostSelector
+                items={companyCostItems}
+                selectedIds={selectedCompanyCostIds}
+                setSelectedIds={setSelectedCompanyCostIds}
+                orderCount={orderCount}
+                setOrderCount={handleOrderCountChange}
+                isLoading={companyCostsLoading}
+              />
             </motion.div>
           </motion.div>
 

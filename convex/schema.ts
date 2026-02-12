@@ -11,17 +11,22 @@ export default defineSchema({
     updatedAt: v.number(),
   }),
 
-  // 운임 타입 (할인/일반 등 업체별 운임 구분)
+  // 운임 타입 (배송지(창고)별 운임 구분)
+  // 📌 비유: 같은 택배회사라도 물류센터마다 요금이 다른 것처럼,
+  //    운임 타입은 업체가 아닌 창고(배송지) 단위로 관리됩니다.
   shippingRateTypes: defineTable({
-    companyId: v.id("shippingCompanies"), // 업체 ID
+    companyId: v.optional(v.id("shippingCompanies")),   // 레거시 호환용 (마이그레이션 후 제거 예정)
+    warehouseId: v.optional(v.id("companyWarehouses")), // 배송지(창고) ID — 운임의 실제 기준
     name: v.string(),                      // 운임 타입명 (예: "할인운임제", "일반운임제")
     description: v.optional(v.string()),   // 설명 (예: "월, 수, 금")
     currency: v.optional(v.union(v.literal("USD"), v.literal("CNY"), v.literal("KRW"))),  // 통화 - 기본값 "USD"
+    unitType: v.optional(v.union(v.literal("cbm"), v.literal("kg"))),  // 요금 단위 (기본값 "cbm")
     isDefault: v.boolean(),                // 기본 선택 여부
     sortOrder: v.number(),                 // 정렬 순서
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_company", ["companyId"]),
+  }).index("by_company", ["companyId"])       // 레거시 호환용
+    .index("by_warehouse", ["warehouseId"]),  // 신규: 배송지별 조회
 
   // CBM 구간별 국제 운송료 (운임 타입별)
   internationalShippingRates: defineTable({

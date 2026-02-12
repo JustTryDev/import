@@ -13,7 +13,9 @@ export const listByCompany = query({
   },
 })
 
-// 창고 생성
+// 창고 생성 + 기본 운임 타입 자동 생성
+// 📌 비유: 새 물류센터를 열면, 기본 요금표 양식도 함께 만들어지는 것
+//    나중에 관리자가 요금표에 실제 금액을 채워넣으면 됩니다.
 export const create = mutation({
   args: {
     companyId: v.id("shippingCompanies"),
@@ -25,12 +27,30 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now()
-    return await ctx.db.insert("companyWarehouses", {
+
+    // 1. 창고 생성
+    const warehouseId = await ctx.db.insert("companyWarehouses", {
       ...args,
       isActive: true,
       createdAt: now,
       updatedAt: now,
     })
+
+    // 2. 기본 운임 타입 자동 생성 (빈 요금 테이블)
+    //    창고를 만들자마자 운임 요금 탭에서 바로 요금표 입력이 가능하도록
+    await ctx.db.insert("shippingRateTypes", {
+      companyId: args.companyId,
+      warehouseId: warehouseId,
+      name: `${args.name} 기본 운임`,
+      currency: "USD",
+      unitType: "cbm",
+      isDefault: true,
+      sortOrder: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    return warehouseId
   },
 })
 

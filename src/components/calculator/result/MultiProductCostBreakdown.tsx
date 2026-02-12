@@ -63,7 +63,7 @@ export function MultiProductCostBreakdown({
   // 제품별 상세 펼침/접힘 상태
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
 
-  // 제품별 마진율 상태 (기본값: 150%)
+  // 제품별 마진율 상태 (기본값: 50% = 내부값 150)
   const [marginRates, setMarginRates] = useState<Map<string, number>>(new Map())
 
   // 원화 → 외화 역산 함수
@@ -196,7 +196,7 @@ export function MultiProductCostBreakdown({
                         </span>
                         <ArrowRight className="h-3 w-3 text-gray-400" />
                         <Select
-                          value={String(marginRates.get(productResult.productId) ?? 200)}
+                          value={String(marginRates.get(productResult.productId) ?? 150)}
                           onValueChange={(value) => {
                             setMarginRates(prev => {
                               const next = new Map(prev)
@@ -206,22 +206,68 @@ export function MultiProductCostBreakdown({
                           }}
                         >
                           <SelectTrigger className="h-6 w-[80px] text-xs">
-                            <SelectValue placeholder="100%">
-                              {(marginRates.get(productResult.productId) ?? 200) - 100}%
+                            <SelectValue placeholder="50%">
+                              {(marginRates.get(productResult.productId) ?? 150) - 100}%
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent>
-                            {[150, 160, 170, 180, 190, 200].map(rate => (
+                          <SelectContent position="popper" sideOffset={4} className="max-h-[400px] overflow-y-auto">
+                            {[110, 120, 130, 140, 150, 160, 170, 180, 190, 200].map(rate => (
                               <SelectItem key={rate} value={String(rate)}>{rate - 100}%</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <span className="text-gray-400">=</span>
                         <span className="text-sm font-bold text-green-600">
-                          {formatNumberWithCommas(Math.round(productResult.unitCost * (marginRates.get(productResult.productId) ?? 200) / 100))}원
+                          {formatNumberWithCommas(Math.round(productResult.unitCost * (marginRates.get(productResult.productId) ?? 150) / 100))}원
                         </span>
-                        <span className="text-xs text-gray-400">(마진 포함)</span>
                       </div>
+                      {/* 시장 평균가 vs 판매가 프로그레스 바 비교 */}
+                      {product && (() => {
+                        // 마진 적용 판매가
+                        const sellingPrice = Math.round(
+                          productResult.unitCost * (marginRates.get(productResult.productId) ?? 150) / 100
+                        )
+                        // 시장 평균가: 제품 단가(외화) × 2 × 환율
+                        const rate = product.currency === "USD" ? (usdRate ?? 0) : (cnyRate ?? 0)
+                        const marketAvgPrice = Math.round(product.unitPrice * 2 * rate)
+                        // 바의 100% 기준 = 둘 중 큰 값의 120% (여유 공간)
+                        const maxPrice = Math.max(sellingPrice, marketAvgPrice) * 1.2
+                        // 판매가가 평균가 이상이면 초록(유리), 미만이면 빨강(불리)
+                        const isAboveAvg = sellingPrice >= marketAvgPrice
+                        const sellingBarWidth = maxPrice > 0 ? (sellingPrice / maxPrice) * 100 : 0
+                        const avgMarkerPos = maxPrice > 0 ? (marketAvgPrice / maxPrice) * 100 : 0
+
+                        return (
+                          <div className="mt-1 w-full min-w-[180px]">
+                            {/* 프로그레스 바 */}
+                            <div className="relative h-4 bg-gray-100 rounded-full overflow-visible">
+                              {/* 판매가 채움 바 */}
+                              <div
+                                className={`absolute top-0 left-0 h-full rounded-full transition-all duration-300 ${
+                                  isAboveAvg ? "bg-green-400" : "bg-red-400"
+                                }`}
+                                style={{ width: `${Math.min(sellingBarWidth, 100)}%` }}
+                              />
+                              {/* 평균가 마커 (세로 점선) */}
+                              <div
+                                className="absolute top-0 h-full flex flex-col items-center"
+                                style={{ left: `${Math.min(avgMarkerPos, 100)}%` }}
+                              >
+                                <div className="w-0.5 h-full bg-amber-500 border-l border-dashed border-amber-500" />
+                              </div>
+                            </div>
+                            {/* 라벨 */}
+                            <div className="flex justify-between mt-0.5">
+                              <span className={`text-[10px] font-semibold ${isAboveAvg ? "text-green-600" : "text-red-600"}`}>
+                                판매 {formatNumberWithCommas(sellingPrice)}원
+                              </span>
+                              <span className="text-[10px] font-semibold text-amber-600">
+                                평균 {formatNumberWithCommas(marketAvgPrice)}원
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })()}
                       <div className="text-xs text-gray-500">
                         총 {formatNumberWithCommas(productResult.totalCost)}원
                       </div>
@@ -450,7 +496,10 @@ export function MultiProductCostBreakdown({
       {/* 총 비용 내역 (프로그레스 스택) */}
       <TotalCostBreakdown
         result={result}
+        products={products}
+        marginRates={marginRates}
         usdRate={usdRate}
+        cnyRate={cnyRate}
         costSettings={costSettings}
         orderCount={orderCount}
       />
@@ -553,12 +602,18 @@ function CostRowWithForeign({
  */
 function TotalCostBreakdown({
   result,
+  products,
+  marginRates,
   usdRate,
+  cnyRate,
   costSettings,
   orderCount = 1,
 }: {
   result: MultiProductCalculationResult
+  products: Product[]
+  marginRates: Map<string, number>
   usdRate: number | null
+  cnyRate: number | null
   costSettings?: {
     inland?: InlandShippingConfig
     domestic?: DomesticShippingConfig
@@ -635,16 +690,50 @@ function TotalCostBreakdown({
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      {/* 헤더 */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">총 비용 내역</span>
-        </div>
-        <span className="text-lg font-bold text-primary">
-          {formatNumberWithCommas(totalCost)}원
-        </span>
+      {/* 헤더: 타이틀 */}
+      <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+        <Receipt className="h-4 w-4 text-gray-500" />
+        <span className="text-sm font-medium text-gray-700">총 비용 내역</span>
       </div>
+      {/* 3열 요약: 총 매출 / 총 비용 / 예상 수익 */}
+      {(() => {
+        const totalRevenue = result.products.reduce((sum, pr) => {
+          const product = products.find(p => p.id === pr.productId)
+          if (!product) return sum
+          const marginRate = marginRates.get(pr.productId) ?? 150
+          const sellingPrice = Math.round(pr.unitCost * marginRate / 100)
+          return sum + sellingPrice * product.quantity
+        }, 0)
+        const totalProfit = totalRevenue - totalCost
+        const isProfit = totalProfit >= 0
+
+        return (
+          <div className="flex items-center border-b border-gray-100">
+            {/* 총 매출 */}
+            <div className="flex-1 px-4 py-3 text-center">
+              <div className="text-[10px] text-gray-400 mb-0.5">총 매출</div>
+              <div className="text-sm font-bold text-primary">
+                {formatNumberWithCommas(totalRevenue)}원
+              </div>
+            </div>
+            <span className="text-gray-300 font-bold text-lg">-</span>
+            {/* 총 비용 */}
+            <div className="flex-1 px-4 py-3 text-center">
+              <div className="text-[10px] text-gray-400 mb-0.5">총 비용</div>
+              <div className="text-sm font-bold text-primary">
+                {formatNumberWithCommas(totalCost)}원
+              </div>
+            </div>
+            {/* 예상 수익 */}
+            <div className={`flex-1 px-4 py-3 text-center rounded-br-none ${isProfit ? "bg-green-50" : "bg-red-50"}`}>
+              <div className="text-[10px] text-gray-400 mb-0.5">예상 수익</div>
+              <div className={`text-sm font-bold ${isProfit ? "text-green-600" : "text-red-600"}`}>
+                {isProfit ? "+" : ""}{formatNumberWithCommas(totalProfit)}원
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="p-4 space-y-4">
         {/* ===== 섹션 1: 제품 원가 ===== */}

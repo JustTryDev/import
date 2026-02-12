@@ -10,6 +10,10 @@ import { useMemo } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
+import {
+  DEFAULT_PORT_SHIPPING_RATES,
+  type PortShippingRateMap,
+} from "@/data/portShippingRates"
 
 // 내륙 운송료 설정 타입
 export interface InlandConfig {
@@ -41,14 +45,17 @@ export interface ContainerInlandConfig {
 // 비용 설정 타입
 export interface CostSetting {
   _id: Id<"costSettings">
-  type: "inland" | "domestic" | "3pl" | "containerInland"
+  type: "inland" | "domestic" | "3pl" | "containerInland" | "portShipping"
   name: string
   description?: string
-  config: InlandConfig | DomesticConfig | ThreePLConfig | ContainerInlandConfig
+  config: InlandConfig | DomesticConfig | ThreePLConfig | ContainerInlandConfig | PortShippingRateMap
   isActive: boolean
   createdAt: number
   updatedAt: number
 }
+
+// 항구별 운임 타입 re-export (다른 파일에서 사용)
+export type { PortShippingRateMap } from "@/data/portShippingRates"
 
 // 기본값 (DB에 데이터가 없을 때 사용)
 const DEFAULT_INLAND: InlandConfig = { ratePerCbm: 70 }
@@ -98,6 +105,13 @@ export function useCostSettings() {
     return setting as CostSetting | undefined
   }, [settings])
 
+  // 항구별 국제 운송비 설정 (FCL 모드에서 출발 항구별 운임)
+  // 📌 비유: "어느 우체국에서 보내느냐"에 따라 달라지는 택배비 요금표
+  const portShippingSetting = useMemo(() => {
+    const setting = settings?.find((s) => s.type === "portShipping")
+    return setting as CostSetting | undefined
+  }, [settings])
+
   // 계산용 설정값 (기본값 폴백)
   const inlandConfig = useMemo((): InlandConfig => {
     if (inlandSetting?.config) {
@@ -127,6 +141,14 @@ export function useCostSettings() {
     return DEFAULT_CONTAINER_INLAND
   }, [containerInlandSetting])
 
+  // 항구별 국제 운송비 (DB에 있으면 사용, 없으면 코드 기본값)
+  const portShippingConfig = useMemo((): PortShippingRateMap => {
+    if (portShippingSetting?.config) {
+      return portShippingSetting.config as PortShippingRateMap
+    }
+    return DEFAULT_PORT_SHIPPING_RATES
+  }, [portShippingSetting])
+
   return {
     // 전체 설정 목록
     settings: settings as CostSetting[] | undefined,
@@ -137,12 +159,14 @@ export function useCostSettings() {
     domesticSetting,
     threePLSetting,
     containerInlandSetting,
+    portShippingSetting,
 
     // 계산용 설정값 (기본값 포함)
     inlandConfig,
     domesticConfig,
     threePLConfig,
     containerInlandConfig,
+    portShippingConfig,
 
     // 뮤테이션
     updateSetting,

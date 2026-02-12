@@ -9,7 +9,7 @@
  * - 3PL + 배송비 (CBM 단위당 요금)
  */
 import { useState } from "react"
-import { Truck, Package, MapPin, Save, RotateCcw, Container } from "lucide-react"
+import { Truck, Package, MapPin, Save, RotateCcw, Container, Ship } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,7 +21,10 @@ import type {
   DomesticConfig,
   ThreePLConfig,
   ContainerInlandConfig,
+  PortShippingRateMap,
 } from "@/hooks/useCostSettings"
+import { CHINESE_PORTS } from "@/data/chinesePorts"
+import type { ContainerType } from "@/lib/calculations/container"
 
 export function CostSettingsManager() {
   const {
@@ -31,10 +34,12 @@ export function CostSettingsManager() {
     domesticSetting,
     threePLSetting,
     containerInlandSetting,
+    portShippingSetting,
     inlandConfig,
     domesticConfig,
     threePLConfig,
     containerInlandConfig,
+    portShippingConfig,
     updateSetting,
     seedDefaults,
   } = useCostSettings()
@@ -47,6 +52,7 @@ export function CostSettingsManager() {
   const [editDomestic, setEditDomestic] = useState<DomesticConfig | null>(null)
   const [editThreePL, setEditThreePL] = useState<ThreePLConfig | null>(null)
   const [editContainerInland, setEditContainerInland] = useState<ContainerInlandConfig | null>(null)
+  const [editPortShipping, setEditPortShipping] = useState<PortShippingRateMap | null>(null)
 
   // 저장 중 상태
   const [isSaving, setIsSaving] = useState(false)
@@ -120,6 +126,49 @@ export function CostSettingsManager() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // 항구별 국제 운송비 저장
+  // 📌 비유: 전국 우체국 택배비 요금표를 한꺼번에 저장하는 것
+  const handleSavePortShipping = async () => {
+    if (!editPortShipping) return
+    setIsSaving(true)
+    try {
+      if (portShippingSetting) {
+        // 기존 설정 업데이트
+        await updateSetting({
+          id: portShippingSetting._id,
+          config: editPortShipping,
+        })
+      } else {
+        // 최초 생성 (DB에 아직 없을 때)
+        await createSetting({
+          type: "portShipping",
+          name: "항구별 국제 운송비",
+          description: "FCL 모드 출발 항구별 컨테이너 운임 (원, 도착항: 인천)",
+          config: editPortShipping,
+        })
+      }
+      setEditPortShipping(null)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 항구별 운임 개별 값 변경 핸들러
+  const handlePortShippingChange = (
+    portId: string,
+    containerType: ContainerType,
+    value: number
+  ) => {
+    const current = editPortShipping ?? { ...portShippingConfig }
+    setEditPortShipping({
+      ...current,
+      [portId]: {
+        ...(current[portId] ?? portShippingConfig[portId] ?? {}),
+        [containerType]: value,
+      },
+    })
   }
 
   // 기본값 생성
@@ -593,6 +642,97 @@ export function CostSettingsManager() {
 
         <p className="text-xs text-gray-400 mt-2">
           예: 20ft 300km 운송 = max({containerInlandConfig["20DC"].minCost.toLocaleString()}원, 300 × {containerInlandConfig["20DC"].perKmRate.toLocaleString()}원) = {Math.max(containerInlandConfig["20DC"].minCost, 300 * containerInlandConfig["20DC"].perKmRate).toLocaleString()}원
+        </p>
+      </div>
+
+      {/* 5. 항구별 국제 운송비 */}
+      {/* 📌 비유: 전국 우체국마다 택배비가 다르듯이,
+          중국 항구마다 한국(인천항)까지의 컨테이너 운송비가 다릅니다.
+          여기서 항구별로 20ft/40ft/40HC 운송비를 각각 설정합니다. */}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <Ship className="h-5 w-5 text-cyan-500" />
+          <h4 className="font-medium text-gray-800">항구별 국제 운송비</h4>
+          <span className="text-xs text-gray-400">FCL 모드 전용 · 도착항: 인천</span>
+        </div>
+
+        <p className="text-xs text-gray-500 mb-4">
+          출발 항구에 따라 컨테이너 국제 운송비가 달라집니다. 지역별로 그룹핑되어 있으며, 값을 수정하면 즉시 계산에 반영됩니다.
+        </p>
+
+        {/* 지역별 그룹핑 */}
+        {(["동북", "화북", "화동", "화남"] as const).map((region) => {
+          const regionPorts = CHINESE_PORTS.filter((p) => p.region === region)
+          if (regionPorts.length === 0) return null
+
+          return (
+            <div key={region} className="mb-4">
+              {/* 지역 헤더 */}
+              <div className="text-xs font-semibold text-gray-700 bg-gray-50 px-2 py-1 rounded mb-2">
+                {region} 지역
+              </div>
+
+              {/* 항구별 입력 필드 */}
+              {regionPorts.map((port) => (
+                <div key={port.id} className="mb-3 pl-2">
+                  <div className="text-xs font-medium text-gray-600 mb-1">
+                    {port.nameKo} ({port.nameCn})
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["20DC", "40DC", "40HC"] as ContainerType[]).map((type) => (
+                      <div key={type}>
+                        <Label className="text-[10px] text-gray-400">{type}</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          value={formatNumber(
+                            editPortShipping?.[port.id]?.[type]
+                            ?? portShippingConfig[port.id]?.[type]
+                            ?? 0
+                          )}
+                          onChange={(e) =>
+                            handlePortShippingChange(
+                              port.id,
+                              type,
+                              handleNumberInput(e.target.value)
+                            )
+                          }
+                          className="h-7 mt-0.5 text-xs"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+
+        {/* 저장/취소 버튼 */}
+        {editPortShipping && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={handleSavePortShipping}
+              disabled={isSaving}
+              className="h-9"
+            >
+              <Save className="h-4 w-4 mr-1" />
+              저장
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditPortShipping(null)}
+              className="h-9"
+            >
+              취소
+            </Button>
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-2">
+          가까운 항구일수록 운송비가 저렴합니다. 동북(0.85배) → 화북(0.9배) → 화동(기준) → 화남(1.15배)
         </p>
       </div>
     </div>

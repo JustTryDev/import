@@ -107,8 +107,8 @@ export function ImportCalculator() {
   const { factories, isLoading: factoriesLoading } = useFactories()
   const { costItemsMap: factoryCostItemsMap, isLoading: factoryCostItemsLoading } = useAllFactoryCostItems()
 
-  // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL, 컨테이너 내륙) =====
-  const { inlandConfig, domesticConfig, threePLConfig, containerInlandConfig } = useCostSettings()
+  // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL, 컨테이너 내륙, 항구별 운임) =====
+  const { inlandConfig, domesticConfig, threePLConfig, containerInlandConfig, portShippingConfig } = useCostSettings()
 
   // 부대 비용 슬롯 (기본 2개)
   const [factorySlots, setFactorySlots] = useState<FactorySlot[]>(() => createEmptySlots(2))
@@ -154,28 +154,40 @@ export function ImportCalculator() {
   const [portRoadDistanceKm, setPortRoadDistanceKm] = useState<number | null>(null) // 도로 거리 (Google Directions)
 
   // 실제 계산에 사용되는 컨테이너 설정 (DB 설정 + UI 오버라이드 병합)
-  // 📌 우선순위: UI 직접 수정 > DB 저장 설정 > 기본값
+  // 📌 우선순위: UI 직접 수정 > DB 항구별 운임 > DB 내륙 설정 > 기본값
+  //    비유: 커스텀 견적 > 우체국별 요금표 > 기본 요금표
   const mergedContainerConfig = useMemo<ContainerConfig>(() => {
     const base = DEFAULT_CONTAINER_CONFIG
     const result = { ...base }
     for (const type of ["20DC", "40DC", "40HC"] as ContainerType[]) {
-      // DB에서 가져온 컨테이너 내륙 설정 반영
+      // 1. 선택된 항구의 국제 운송비 조회 (DB 오버라이드 또는 기본값)
+      // 📌 비유: "칭다오 우체국"의 택배비를 요금표에서 찾는 것
+      const portRate = selectedPortId
+        ? portShippingConfig[selectedPortId]?.[type]
+        : undefined
+
+      // 2. DB에서 가져온 컨테이너 내륙 설정
       const dbInland = containerInlandConfig[type]
-      if (dbInland) {
-        result[type] = {
-          ...base[type],
+
+      result[type] = {
+        ...base[type],
+        // 항구별 국제 운송비 반영 (있으면 덮어쓰기)
+        ...(portRate !== undefined && { shippingCost: portRate }),
+        // 내륙 운송 설정 반영
+        ...(dbInland && {
           inlandMinCost: dbInland.minCost,
           inlandPerKmRate: dbInland.perKmRate,
-        }
+        }),
       }
-      // UI 오버라이드 반영 (가장 높은 우선순위)
+
+      // 3. UI 오버라이드 반영 (가장 높은 우선순위)
       const overrides = containerConfigOverrides[type]
       if (overrides) {
         result[type] = { ...result[type], ...overrides }
       }
     }
     return result
-  }, [containerConfigOverrides, containerInlandConfig])
+  }, [containerConfigOverrides, containerInlandConfig, selectedPortId, portShippingConfig])
 
   // ===== 설정 모달 =====
   const [settingsOpen, setSettingsOpen] = useState(false)

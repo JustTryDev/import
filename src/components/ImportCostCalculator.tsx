@@ -25,9 +25,6 @@ import type { HsCodeWithTariff, ImportCostResult } from "@/types/tariff"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// 부가세율 (한국 기준 10%)
-const VAT_RATE = 10
-
 /**
  * 숫자를 천 단위 콤마가 포함된 문자열로 변환
  */
@@ -108,11 +105,8 @@ export function ImportCostCalculator() {
     // 과세가격 (제품가격 + 관세)
     const taxablePrice = productPriceKrw + tariffAmount
 
-    // 부가세 계산
-    const vatAmount = Math.round(taxablePrice * (VAT_RATE / 100))
-
-    // 총 수입원가
-    const totalCost = taxablePrice + vatAmount
+    // 총 수입원가 (부가세 제외)
+    const totalCost = taxablePrice
 
     return {
       productPriceCny: numericAmount,
@@ -124,8 +118,6 @@ export function ImportCostCalculator() {
       tariffRate,
       tariffAmount,
       taxablePrice,
-      vatRate: VAT_RATE,
-      vatAmount,
       totalCost,
     }
   }, [selectedItem, rates, numericAmount, useFta])
@@ -139,8 +131,7 @@ export function ImportCostCalculator() {
     // 기본세율로 계산
     const tariffAmount = Math.round(costResult.productPriceKrw * (selectedItem.basicRate / 100))
     const taxablePrice = costResult.productPriceKrw + tariffAmount
-    const vatAmount = Math.round(taxablePrice * (VAT_RATE / 100))
-    const totalCost = taxablePrice + vatAmount
+    const totalCost = taxablePrice
 
     // 절감액
     const savings = totalCost - costResult.totalCost
@@ -469,13 +460,6 @@ export function ImportCostCalculator() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">과세가격</span>
                   <span className="text-gray-700">₩{formatNumber(costResult.taxablePrice)}</span>
-                </div>
-
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">부가세 (10%)</span>
-                  <span className="text-gray-700 font-medium">
-                    ₩{formatNumber(costResult.vatAmount)}
-                  </span>
                 </div>
               </div>
 

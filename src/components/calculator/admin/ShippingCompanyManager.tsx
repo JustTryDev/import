@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Edit2, Check, X } from "lucide-react"
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useShippingCompanies } from "@/hooks"
+import { Id } from "../../../../convex/_generated/dataModel"
+import { WarehouseManager } from "./WarehouseManager"
 
 // 운송 업체 관리 컴포넌트
 export function ShippingCompanyManager() {
@@ -15,6 +17,9 @@ export function ShippingCompanyManager() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [editDescription, setEditDescription] = useState("")
+
+  // 펼침 상태 (창고 목록 보기)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // 업체 추가
   const handleAdd = async () => {
@@ -39,7 +44,7 @@ export function ShippingCompanyManager() {
   const handleUpdate = async () => {
     if (!editingId || !editName.trim()) return
     await updateCompany({
-      id: editingId as any,
+      id: editingId as Id<"shippingCompanies">,
       name: editName.trim(),
       description: editDescription.trim() || undefined,
     })
@@ -49,7 +54,12 @@ export function ShippingCompanyManager() {
   // 삭제
   const handleDelete = async (id: string) => {
     if (!confirm("이 업체를 삭제하시겠습니까? 관련된 모든 데이터가 함께 삭제됩니다.")) return
-    await removeCompany({ id: id as any })
+    await removeCompany({ id: id as Id<"shippingCompanies"> })
+  }
+
+  // 펼침/접힘 토글
+  const toggleExpand = (id: string) => {
+    setExpandedId(expandedId === id ? null : id)
   }
 
   if (isLoading) {
@@ -116,70 +126,96 @@ export function ShippingCompanyManager() {
         {companies?.map((company) => (
           <div
             key={company._id}
-            className="flex items-center justify-between p-3 border border-gray-100 rounded-lg"
+            className="border border-gray-100 rounded-lg overflow-hidden"
           >
-            {editingId === company._id ? (
-              <div className="flex-1 space-y-2 mr-2">
-                <Input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="업체명"
-                />
-                <Input
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="설명 (선택)"
-                />
-              </div>
-            ) : (
-              <div>
-                <div className="font-medium text-gray-900">{company.name}</div>
-                {company.description && (
-                  <div className="text-sm text-gray-500">{company.description}</div>
+            {/* 업체 헤더 */}
+            <div className="flex items-center justify-between p-3">
+              {editingId === company._id ? (
+                <div className="flex-1 space-y-2 mr-2">
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="업체명"
+                  />
+                  <Input
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="설명 (선택)"
+                  />
+                </div>
+              ) : (
+                <div
+                  className="flex-1 flex items-center gap-2 cursor-pointer"
+                  onClick={() => toggleExpand(company._id)}
+                >
+                  {expandedId === company._id ? (
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  )}
+                  <div>
+                    <div className="font-medium text-gray-900">{company.name}</div>
+                    {company.description && (
+                      <div className="text-sm text-gray-500">{company.description}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1">
+                {editingId === company._id ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleUpdate}
+                      disabled={!editName.trim()}
+                    >
+                      <Check className="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingId(null)}
+                    >
+                      <X className="h-4 w-4 text-gray-400" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => startEdit(company)}
+                    >
+                      <Edit2 className="h-4 w-4 text-gray-400" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDelete(company._id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-400" />
+                    </Button>
+                  </>
                 )}
               </div>
-            )}
-
-            <div className="flex items-center gap-1">
-              {editingId === company._id ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleUpdate}
-                    disabled={!editName.trim()}
-                  >
-                    <Check className="h-4 w-4 text-green-600" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingId(null)}
-                  >
-                    <X className="h-4 w-4 text-gray-400" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => startEdit(company)}
-                  >
-                    <Edit2 className="h-4 w-4 text-gray-400" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDelete(company._id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-400" />
-                  </Button>
-                </>
-              )}
             </div>
+
+            {/* 창고 목록 (펼침 상태일 때만) */}
+            {expandedId === company._id && (
+              <div className="px-3 pb-3">
+                <WarehouseManager
+                  companyId={company._id as Id<"shippingCompanies">}
+                />
+              </div>
+            )}
           </div>
         ))}
+      </div>
+
+      <div className="text-xs text-gray-400 p-2 mt-2">
+        * 업체를 클릭하면 중국 내 창고를 관리할 수 있습니다
       </div>
     </div>
   )

@@ -43,6 +43,9 @@ export { useTariffSearch } from "./useTariffSearch"
 // 운송 업체 관련
 export { useShippingCompanies, useShippingCompany } from "./useShippingCompanies"
 
+// 운송 업체 창고 관련
+export { useCompanyWarehouses } from "./useCompanyWarehouses"
+
 // 운송료 관련
 export {
   useShippingRateTypes,

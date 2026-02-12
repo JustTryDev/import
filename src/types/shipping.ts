@@ -89,6 +89,22 @@ export interface InternationalShippingRate {
   updatedAt: number
 }
 
+// ===== 운송 업체 창고 =====
+
+// 운송 업체 중국 내 창고
+export interface CompanyWarehouse {
+  _id: Id<"companyWarehouses">
+  companyId: Id<"shippingCompanies">
+  name: string               // 창고명
+  provinceCode: string       // 성 코드
+  cityCode: string           // 시 코드
+  detailAddress?: string     // 상세 주소
+  isActive: boolean
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
+}
+
 // ===== 비용 항목 =====
 
 // 업체별 공통 비용 항목 (통관 건당 발생)
@@ -100,7 +116,6 @@ export interface CompanyCostItem {
   defaultAmount: number
   isDivisible: boolean      // 주문 건수 분할 가능 여부
   isRequired: boolean
-  isVatApplicable?: boolean  // 부가세 적용 여부 (통관수수료: true, D/O·C/O: false) - 기본값 false
   sortOrder: number
   createdAt: number
   updatedAt: number
@@ -112,6 +127,8 @@ export interface Factory {
   name: string
   description?: string
   currency: "USD" | "CNY"
+  provinceCode?: string   // 성 코드 (예: "440000" = 광둥성)
+  cityCode?: string       // 시 코드 (예: "440100" = 광저우시)
   inlandShipping: number  // 중국 내륙 운송료 기본값
   inspectionFee: number   // 검품비 기본값
   isActive: boolean
@@ -180,24 +197,13 @@ export interface CalculationResult {
   // 관세 과세가격 (제품가격 + 부대비용)
   taxableBase: number           // 관세 과세 기준
 
-  // 관세/부가세
+  // 관세
   tariffRate: number            // 적용 관세율 (%)
   tariffAmount: number          // 관세 (실제 적용된 금액)
   basicTariffRate: number       // 기본 관세율 (%)
   basicTariffAmount: number     // 기본 관세 금액
   ftaTariffRate: number         // FTA 관세율 (%)
   ftaTariffAmount: number       // FTA 관세 금액
-  vatBase: number               // 부가세 과세 기준 (과세가격 + 관세)
-  vatAmount: number             // 부가세 (10%) - 관세 관련 부가세만
-
-  // 부가세 상세 내역 (항목별 분리)
-  vatDetail: {
-    tariffVat: number           // 관세 부가세 (10%)
-    domesticShippingVat: number // 국내운송료 부가세 (10%)
-    threePLVat: number          // 3PL 비용 부가세 (10%)
-    companyCostsVat: number     // 업체 비용 중 부가세 적용 항목 부가세 합계
-    totalVat: number            // 총 부가세 (관세 + 국내운송료 + 3PL + 업체비용)
-  }
 
   // 내륙 운송료 (중국 공장 → 항구)
   inlandShippingUSD: number
@@ -225,8 +231,6 @@ export interface CalculationResult {
     originalAmount: number    // 원래 금액
     dividedAmount: number     // 분할 후 금액
     orderCount: number        // 적용된 주문 건수
-    isVatApplicable: boolean  // 부가세 적용 여부
-    vatAmount: number         // 해당 항목의 부가세 금액
   }[]
   totalCompanyCosts: number     // 업체별 공통 비용 합계
 
@@ -240,7 +244,6 @@ export interface CalculationResult {
     additionalCosts: number     // 부대비용
     inlandShipping: number      // 내륙운송료 (중국 공장→항구)
     tariff: number              // 관세
-    vat: number                 // 부가세
     internationalShipping: number // 국제운송료
     domesticShipping: number    // 국내운송료
     threePLCost: number         // 3PL 비용 + 배송비
@@ -279,10 +282,9 @@ export interface ProductCalculationResult {
   // 제품 비용
   productPriceKRW: number         // 제품가격 (원화)
 
-  // 관세/부가세
+  // 관세
   tariffRate: number              // 적용된 관세율 (%)
   tariffAmount: number            // 관세 금액
-  vatAmount: number               // 부가세 (관세 관련)
 
   // 공장 비용 (균등 분배 후)
   factoryCostsTotal: number       // 공장비용 합계
@@ -301,7 +303,6 @@ export interface ProductCalculationResult {
     internationalShipping: number // 국제운송료 (분배)
     domesticShipping: number      // 국내운송료 (분배)
     threePL: number               // 3PL 비용 (분배)
-    domesticVat: number           // 국내 관련 부가세 (분배)
   }
 
   // 최종 결과
@@ -361,12 +362,7 @@ export interface MultiProductCalculationResult {
     originalAmount: number
     dividedAmount: number
     orderCount: number
-    isVatApplicable: boolean
-    vatAmount: number
   }[]
-
-  // 부가세 총액
-  totalVat: number
 
   // 비용 구성 요약 (전체)
   breakdown: {
@@ -374,7 +370,6 @@ export interface MultiProductCalculationResult {
     factoryCosts: number          // 공장비용 합계
     inlandShipping: number        // 내륙운송료
     tariff: number                // 관세 합계
-    vat: number                   // 부가세 합계
     internationalShipping: number // 국제운송료
     domesticShipping: number      // 국내운송료
     threePLCost: number           // 3PL 비용

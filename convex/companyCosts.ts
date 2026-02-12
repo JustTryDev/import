@@ -29,7 +29,6 @@ export const create = mutation({
     defaultAmount: v.number(),
     isDivisible: v.boolean(),
     isRequired: v.boolean(),
-    isVatApplicable: v.optional(v.boolean()),  // 부가세 적용 여부 (기본값 false)
     sortOrder: v.number(),
   },
   handler: async (ctx, args) => {
@@ -53,7 +52,6 @@ export const createBulk = mutation({
         defaultAmount: v.number(),
         isDivisible: v.boolean(),
         isRequired: v.boolean(),
-        isVatApplicable: v.optional(v.boolean()),  // 부가세 적용 여부 (기본값 false)
         sortOrder: v.number(),
       })
     ),
@@ -85,7 +83,6 @@ export const update = mutation({
     defaultAmount: v.optional(v.number()),
     isDivisible: v.optional(v.boolean()),
     isRequired: v.optional(v.boolean()),
-    isVatApplicable: v.optional(v.boolean()),  // 부가세 적용 여부
     sortOrder: v.optional(v.number()),
   },
   handler: async (ctx, args) => {

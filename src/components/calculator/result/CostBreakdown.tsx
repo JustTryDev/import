@@ -234,20 +234,10 @@ export function CostBreakdown({
     )
   }
 
-  const { breakdown, additionalCostsDetail, companyCostsDetail, remittanceFeeBase, vatDetail } = result
+  const { breakdown, additionalCostsDetail, companyCostsDetail, remittanceFeeBase } = result
 
   // 송금 수수료 기준 (100만원 이상이면 T/T 송금)
   const isWireTransfer = remittanceFeeBase >= 1_000_000
-
-  // 업체별 공통 비용 분리 (부가세 적용 여부에 따라)
-  const vatExemptCosts = companyCostsDetail.filter((item) => !item.isVatApplicable)  // D/O, C/O 등
-  const vatApplicableCosts = companyCostsDetail.filter((item) => item.isVatApplicable)  // 통관수수료
-
-  // 서비스 부가세 (국내운송료 + 3PL + 통관수수료 부가세)
-  const serviceVat = vatDetail.domesticShippingVat + vatDetail.threePLVat + vatDetail.companyCostsVat
-
-  // 상단 부가세: (제품가격 + 내륙운송료 + 부대비용) * 10% - 관세는 부가세에 포함되지 않음
-  const topVat = Math.round((breakdown.productCost + result.inlandShippingKRW + breakdown.additionalCosts) * 0.1)
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -303,13 +293,6 @@ export function CostBreakdown({
           ftaTariffRate={result.ftaTariffRate}
         />
 
-        {/* 부가세: (제품가격 + 내륙운송료 + 부대비용 + 관세) * 10% */}
-        <CostRow
-          label="부가세"
-          amount={topVat}
-          subLabel="(10%)"
-        />
-
         <Divider />
 
         {/* 송금수수료 (결제 방식 표시) */}
@@ -326,10 +309,10 @@ export function CostBreakdown({
           subLabel={roundedCbm ? `(${roundedCbm.toFixed(1)}CBM)` : undefined}
         />
 
-        {/* 업체별 공통비용 - 부가세 미적용 (D/O, C/O) */}
-        {vatExemptCosts.length > 0 && (
+        {/* 업체별 공통비용 */}
+        {companyCostsDetail.length > 0 && (
           <>
-            {vatExemptCosts.map((item) => (
+            {companyCostsDetail.map((item) => (
               <CostRow
                 key={item.itemId}
                 label={item.name}
@@ -341,20 +324,6 @@ export function CostBreakdown({
         )}
 
         <Divider />
-
-        {/* 통관수수료 - 부가세 적용 */}
-        {vatApplicableCosts.length > 0 && (
-          <>
-            {vatApplicableCosts.map((item) => (
-              <CostRow
-                key={item.itemId}
-                label={item.name}
-                amount={item.dividedAmount}
-                subLabel={item.orderCount > 1 ? `(÷${item.orderCount})` : undefined}
-              />
-            ))}
-          </>
-        )}
 
         {/* 국내운송료 */}
         <CostRow
@@ -368,15 +337,6 @@ export function CostBreakdown({
           label="3PL 비용 + 배송비"
           amount={breakdown.threePLCost}
           subLabel={`(${costSettings?.threePL?.unit ?? 0.1}CBM당 ${(costSettings?.threePL?.ratePerUnit ?? 15000).toLocaleString()}원)`}
-        />
-
-        <Divider />
-
-        {/* 서비스 부가세 (통관수수료 + 국내운송료 부가세) */}
-        <CostRow
-          label="부가세"
-          amount={serviceVat}
-          subLabel="(10%)"
         />
       </div>
     </div>

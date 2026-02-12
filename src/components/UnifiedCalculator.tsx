@@ -53,7 +53,6 @@ interface CalculationResult {
     tariffRate: number      // 세율 (%)
     tariffAmount: number    // 관세액
     taxablePrice: number    // 과세가격
-    vatAmount: number       // 부가세
     totalCost: number       // 총 수입원가
   }
 
@@ -62,7 +61,6 @@ interface CalculationResult {
     tariffRate: number
     tariffAmount: number
     taxablePrice: number
-    vatAmount: number
     totalCost: number
   }
 
@@ -172,15 +170,13 @@ export default function UnifiedCalculator() {
     const basicTariffRate = selectedItem.basicRate
     const basicTariffAmount = totalPriceKRW * (basicTariffRate / 100)
     const basicTaxablePrice = totalPriceKRW + basicTariffAmount
-    const basicVatAmount = basicTaxablePrice * 0.10
-    const basicTotalCost = basicTaxablePrice + basicVatAmount
+    const basicTotalCost = basicTaxablePrice
 
     // 3단계: FTA 세율 적용 (FTA 세율이 없으면 기본세율 사용)
     const ftaTariffRate = selectedItem.ftaRate ?? selectedItem.basicRate
     const ftaTariffAmount = totalPriceKRW * (ftaTariffRate / 100)
     const ftaTaxablePrice = totalPriceKRW + ftaTariffAmount
-    const ftaVatAmount = ftaTaxablePrice * 0.10
-    const ftaTotalCost = ftaTaxablePrice + ftaVatAmount
+    const ftaTotalCost = ftaTaxablePrice
 
     // 4단계: 절감액 계산
     const savings = basicTotalCost - ftaTotalCost
@@ -192,14 +188,12 @@ export default function UnifiedCalculator() {
         tariffRate: basicTariffRate,
         tariffAmount: basicTariffAmount,
         taxablePrice: basicTaxablePrice,
-        vatAmount: basicVatAmount,
         totalCost: basicTotalCost,
       },
       fta: {
         tariffRate: ftaTariffRate,
         tariffAmount: ftaTariffAmount,
         taxablePrice: ftaTaxablePrice,
-        vatAmount: ftaVatAmount,
         totalCost: ftaTotalCost,
       },
       savings,
@@ -548,10 +542,6 @@ export default function UnifiedCalculator() {
                   <span className="text-gray-600">과세가격</span>
                   <span>₩{formatKRW(calculationResult.basic.taxablePrice)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">부가세(10%)</span>
-                  <span>₩{formatKRW(calculationResult.basic.vatAmount)}</span>
-                </div>
                 <hr className="my-2" />
                 <div className="flex justify-between font-bold">
                   <span>총액</span>
@@ -580,10 +570,6 @@ export default function UnifiedCalculator() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">과세가격</span>
                   <span>₩{formatKRW(calculationResult.fta.taxablePrice)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">부가세(10%)</span>
-                  <span>₩{formatKRW(calculationResult.fta.vatAmount)}</span>
                 </div>
                 <hr className="my-2" />
                 <div className="flex justify-between font-bold text-blue-600">

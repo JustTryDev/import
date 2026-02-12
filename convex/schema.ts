@@ -35,6 +35,19 @@ export default defineSchema({
   }).index("by_rate_type", ["rateTypeId"])
     .index("by_rate_type_cbm", ["rateTypeId", "cbm"]),
 
+  // 운송 업체 창고 (업체별 중국 내 창고 주소)
+  companyWarehouses: defineTable({
+    companyId: v.id("shippingCompanies"),  // 소속 업체 ID
+    name: v.string(),                       // 창고명 (예: "쑤저우 창고")
+    provinceCode: v.string(),               // 성 코드 (예: "320000")
+    cityCode: v.string(),                   // 시 코드 (예: "320500")
+    detailAddress: v.optional(v.string()),  // 상세 주소 (선택)
+    isActive: v.boolean(),                  // 활성화 여부
+    sortOrder: v.number(),                  // 정렬 순서
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_company", ["companyId"]),
+
   // 업체별 공통 비용 항목 (통관 건당 발생)
   companyCostItems: defineTable({
     companyId: v.id("shippingCompanies"),  // 업체 ID
@@ -43,7 +56,7 @@ export default defineSchema({
     defaultAmount: v.number(),              // 기본 금액 (원)
     isDivisible: v.boolean(),               // 주문 건수 분할 가능 여부
     isRequired: v.boolean(),                // 필수 여부
-    isVatApplicable: v.optional(v.boolean()), // 부가세 적용 여부 (통관수수료: true, D/O·C/O: false) - 기본값 false
+    isVatApplicable: v.optional(v.boolean()), // (레거시) 부가세 적용 여부 - 더 이상 사용하지 않음
     sortOrder: v.number(),                  // 정렬 순서
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -54,6 +67,8 @@ export default defineSchema({
     name: v.string(),                       // 공장명
     description: v.optional(v.string()),    // 설명 (주소, 연락처 등)
     currency: v.string(),                   // 통화 (CNY, USD)
+    provinceCode: v.optional(v.string()),   // 성 코드 (예: "440000" = 광둥성)
+    cityCode: v.optional(v.string()),       // 시 코드 (예: "440100" = 광저우시)
     isActive: v.boolean(),                  // 활성화 여부
     sortOrder: v.number(),                  // 정렬 순서
     createdAt: v.number(),

@@ -18,6 +18,8 @@ export const create = mutation({
     name: v.string(),
     description: v.optional(v.string()),
     currency: v.string(),
+    provinceCode: v.optional(v.string()),
+    cityCode: v.optional(v.string()),
     sortOrder: v.number(),
   },
   handler: async (ctx, args) => {
@@ -38,6 +40,8 @@ export const update = mutation({
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     currency: v.optional(v.string()),
+    provinceCode: v.optional(v.string()),
+    cityCode: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     sortOrder: v.optional(v.number()),
   },

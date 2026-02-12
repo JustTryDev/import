@@ -35,12 +35,8 @@ import {
 import {
   calculateCompanyCosts,
   sumCompanyCosts,
-  sumCompanyCostsVat,
   sumAdditionalCosts,
   calculateTariff,
-  calculateVat,
-  calculateDomesticShippingVat,
-  calculate3PLVat,
   CostItemInput,
   AdditionalCostInput,
 } from "./costs"
@@ -159,10 +155,7 @@ export function calculateImportCost(
     ftaTariffRate
   )
 
-  // 5. 부가세 계산 (제품가격 + 부대비용 + 내륙운송료) × 10% (관세 제외!)
-  const { vatBase, vatAmount } = calculateVat(taxableBase, inlandShippingKRW)
-
-  // 6. 국제 운송료 (통화별 환율 적용)
+  // 5. 국제 운송료 (통화별 환율 적용)
   const shippingResult = findShippingRate(shippingRates, totalCbm)
   const internationalShippingRate = shippingResult?.rate ?? 0
 
@@ -192,44 +185,24 @@ export function calculateImportCost(
   const remittanceFeeBase = totalPriceKRW + totalAdditionalCosts + inlandShippingKRW
   const remittanceFee = calculateRemittanceFee(remittanceFeeBase)
 
-  // 9. 업체별 공통 비용 (주문 건수 분할 및 부가세 계산)
+  // 9. 업체별 공통 비용 (주문 건수 분할)
   const companyCostsDetail = calculateCompanyCosts(companyCosts, orderCount)
   const totalCompanyCosts = sumCompanyCosts(companyCostsDetail)
-  const companyCostsVat = sumCompanyCostsVat(companyCostsDetail)
-
-  // 9.5 국내운송료 부가세 계산 (10%)
-  const domesticShippingVat = calculateDomesticShippingVat(domesticShippingKRW)
-
-  // 9.6 3PL 비용 부가세 계산 (10%)
-  const threePLVat = calculate3PLVat(threePLCostKRW)
-
-  // 부가세 상세 내역
-  const vatDetail = {
-    tariffVat: vatAmount,                                    // 관세 부가세
-    domesticShippingVat,                                     // 국내운송료 부가세
-    threePLVat,                                              // 3PL 비용 부가세
-    companyCostsVat,                                         // 업체 비용 부가세 (통관수수료 등)
-    totalVat: vatAmount + domesticShippingVat + threePLVat + companyCostsVat,  // 총 부가세
-  }
 
   // 10. 총 수입원가 계산 (반올림)
-  // = 제품가격 + 부대비용 + 내륙운송료 + 관세 + 관세부가세
-  // + 국제운송료 + 국내운송료 + 국내운송료부가세 + 3PL비용 + 3PL부가세
-  // + 송금수수료 + 업체공통비용 + 업체비용부가세
+  // = 제품가격 + 부대비용 + 내륙운송료 + 관세
+  // + 국제운송료 + 국내운송료 + 3PL비용
+  // + 송금수수료 + 업체공통비용
   const totalCost = Math.round(
     totalPriceKRW +
     totalAdditionalCosts +
     inlandShippingKRW +
     tariffAmount +
-    vatAmount +                    // 관세 부가세
     internationalShippingKRW +
     domesticShippingKRW +
-    domesticShippingVat +          // 국내운송료 부가세
-    threePLCostKRW +               // 3PL 비용 + 배송비
-    threePLVat +                   // 3PL 부가세
+    threePLCostKRW +
     remittanceFee +
-    totalCompanyCosts +
-    companyCostsVat                // 업체 비용 부가세
+    totalCompanyCosts
   )
 
   // 개당 수입원가 (반올림)
@@ -252,18 +225,13 @@ export function calculateImportCost(
     // 관세 과세가격
     taxableBase,
 
-    // 관세/부가세
+    // 관세
     tariffRate,
     tariffAmount,
     basicTariffRate,
     basicTariffAmount,
     ftaTariffRate,
     ftaTariffAmount,
-    vatBase,
-    vatAmount,
-
-    // 부가세 상세 내역
-    vatDetail,
 
     // 내륙 운송료 (중국 공장 → 항구)
     inlandShippingUSD,
@@ -295,7 +263,6 @@ export function calculateImportCost(
       additionalCosts: totalAdditionalCosts,
       inlandShipping: inlandShippingKRW,
       tariff: tariffAmount,
-      vat: vatAmount,
       internationalShipping: internationalShippingKRW,
       domesticShipping: domesticShippingKRW,
       threePLCost: threePLCostKRW,
@@ -352,12 +319,8 @@ export {
   calculate3PLCost,
   calculateCompanyCosts,
   sumCompanyCosts,
-  sumCompanyCostsVat,
   sumAdditionalCosts,
   calculateTariff,
-  calculateVat,
-  calculateDomesticShippingVat,
-  calculate3PLVat,
 }
 
 // 다중 제품 계산 함수

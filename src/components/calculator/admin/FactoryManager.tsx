@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronRight, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -14,6 +13,8 @@ import {
 } from "@/components/ui/select"
 import { useFactories, useFactoryCostItems } from "@/hooks"
 import { Id } from "../../../../convex/_generated/dataModel"
+import { ChinaAddressSelector } from "../common/ChinaAddressSelector"
+import { formatFullAddress } from "@/data/chinaRegions"
 
 // 비용 항목 관리 서브 컴포넌트
 function FactoryCostItemsManager({
@@ -224,12 +225,16 @@ export function FactoryManager() {
   const [newName, setNewName] = useState("")
   const [newDescription, setNewDescription] = useState("")
   const [newCurrency, setNewCurrency] = useState<"CNY" | "USD">("CNY")
+  const [newProvinceCode, setNewProvinceCode] = useState<string | null>(null)
+  const [newCityCode, setNewCityCode] = useState<string | null>(null)
 
   // 수정 상태
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [editDescription, setEditDescription] = useState("")
   const [editCurrency, setEditCurrency] = useState<"CNY" | "USD">("CNY")
+  const [editProvinceCode, setEditProvinceCode] = useState<string | null>(null)
+  const [editCityCode, setEditCityCode] = useState<string | null>(null)
 
   // 펼침 상태 (비용 항목 보기)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -242,12 +247,21 @@ export function FactoryManager() {
       name: newName.trim(),
       description: newDescription.trim() || undefined,
       currency: newCurrency,
+      provinceCode: newProvinceCode ?? undefined,
+      cityCode: newCityCode ?? undefined,
       sortOrder: (factories?.length ?? 0) + 1,
     })
 
+    resetAddForm()
+  }
+
+  // 추가 폼 초기화
+  const resetAddForm = () => {
     setNewName("")
     setNewDescription("")
     setNewCurrency("CNY")
+    setNewProvinceCode(null)
+    setNewCityCode(null)
     setIsAdding(false)
   }
 
@@ -257,6 +271,8 @@ export function FactoryManager() {
     setEditName(factory.name)
     setEditDescription(factory.description ?? "")
     setEditCurrency(factory.currency as "CNY" | "USD")
+    setEditProvinceCode((factory as Record<string, unknown>).provinceCode as string | null ?? null)
+    setEditCityCode((factory as Record<string, unknown>).cityCode as string | null ?? null)
   }
 
   // 수정 저장
@@ -268,6 +284,8 @@ export function FactoryManager() {
       name: editName.trim(),
       description: editDescription.trim() || undefined,
       currency: editCurrency,
+      provinceCode: editProvinceCode ?? undefined,
+      cityCode: editCityCode ?? undefined,
     })
     setEditingId(null)
   }
@@ -281,6 +299,27 @@ export function FactoryManager() {
   // 펼침/접힘 토글
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id)
+  }
+
+  // 성 변경 시 시 초기화
+  const handleNewProvinceChange = (code: string) => {
+    setNewProvinceCode(code)
+    setNewCityCode(null)
+  }
+
+  const handleEditProvinceChange = (code: string) => {
+    setEditProvinceCode(code)
+    setEditCityCode(null)
+  }
+
+  // 공장의 주소 표시 텍스트
+  const getFactoryAddressText = (factory: NonNullable<typeof factories>[number]) => {
+    const provinceCode = (factory as Record<string, unknown>).provinceCode as string | undefined
+    const cityCode = (factory as Record<string, unknown>).cityCode as string | undefined
+    if (provinceCode && cityCode) {
+      return formatFullAddress(provinceCode, cityCode)
+    }
+    return null
   }
 
   if (isLoading) {
@@ -332,6 +371,17 @@ export function FactoryManager() {
                 </Select>
               </div>
             </div>
+            {/* 주소 선택 */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">공장 소재지 (선택)</label>
+              <ChinaAddressSelector
+                provinceCode={newProvinceCode}
+                cityCode={newCityCode}
+                onProvinceChange={handleNewProvinceChange}
+                onCityChange={setNewCityCode}
+                size="sm"
+              />
+            </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={handleAdd}>
                 추가
@@ -339,11 +389,7 @@ export function FactoryManager() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  setIsAdding(false)
-                  setNewName("")
-                  setNewDescription("")
-                }}
+                onClick={resetAddForm}
               >
                 취소
               </Button>
@@ -354,114 +400,136 @@ export function FactoryManager() {
         {/* 공장 목록 */}
         {factories && factories.length > 0 ? (
           <div className="space-y-2">
-            {factories.map((factory) => (
-              <div
-                key={factory._id}
-                className="border border-gray-100 rounded-lg overflow-hidden"
-              >
-                {/* 공장 헤더 */}
-                <div className="flex items-center justify-between p-3">
-                  {editingId === factory._id ? (
-                    <div className="flex-1 flex items-center gap-2 mr-2">
-                      <Input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        placeholder="공장명"
-                        className="flex-1"
-                      />
-                      <Input
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        placeholder="설명"
-                        className="flex-1"
-                      />
-                      <Select
-                        value={editCurrency}
-                        onValueChange={(v) => setEditCurrency(v as "CNY" | "USD")}
-                      >
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="CNY">CNY</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div
-                      className="flex-1 flex items-center gap-2 cursor-pointer"
-                      onClick={() => toggleExpand(factory._id)}
-                    >
-                      {expandedId === factory._id ? (
-                        <ChevronDown className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
-                      )}
-                      <div>
+            {factories.map((factory) => {
+              const addressText = getFactoryAddressText(factory)
+              return (
+                <div
+                  key={factory._id}
+                  className="border border-gray-100 rounded-lg overflow-hidden"
+                >
+                  {/* 공장 헤더 */}
+                  <div className="flex items-center justify-between p-3">
+                    {editingId === factory._id ? (
+                      <div className="flex-1 space-y-2 mr-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">
-                            {factory.name}
-                          </span>
-                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
-                            {factory.currency}
-                          </span>
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="공장명"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            placeholder="설명"
+                            className="flex-1"
+                          />
+                          <Select
+                            value={editCurrency}
+                            onValueChange={(v) => setEditCurrency(v as "CNY" | "USD")}
+                          >
+                            <SelectTrigger className="w-28">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CNY">CNY</SelectItem>
+                              <SelectItem value="USD">USD</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                        {factory.description && (
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            {factory.description}
-                          </div>
-                        )}
+                        {/* 수정 시 주소 선택 */}
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">공장 소재지</label>
+                          <ChinaAddressSelector
+                            provinceCode={editProvinceCode}
+                            cityCode={editCityCode}
+                            onProvinceChange={handleEditProvinceChange}
+                            onCityChange={setEditCityCode}
+                            size="sm"
+                          />
+                        </div>
                       </div>
+                    ) : (
+                      <div
+                        className="flex-1 flex items-center gap-2 cursor-pointer"
+                        onClick={() => toggleExpand(factory._id)}
+                      >
+                        {expandedId === factory._id ? (
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">
+                              {factory.name}
+                            </span>
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
+                              {factory.currency}
+                            </span>
+                          </div>
+                          {/* 주소 또는 설명 표시 */}
+                          {addressText ? (
+                            <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {addressText}
+                            </div>
+                          ) : factory.description ? (
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              {factory.description}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      {editingId === factory._id ? (
+                        <>
+                          <Button size="sm" variant="ghost" onClick={handleUpdate}>
+                            <Check className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingId(null)}
+                          >
+                            <X className="h-4 w-4 text-gray-400" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startEdit(factory)}
+                          >
+                            <Edit2 className="h-4 w-4 text-gray-400" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(factory._id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-400" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 비용 항목 (펼침 상태일 때만) */}
+                  {expandedId === factory._id && (
+                    <div className="px-3 pb-3">
+                      <FactoryCostItemsManager
+                        factoryId={factory._id as Id<"factories">}
+                        currency={factory.currency}
+                      />
                     </div>
                   )}
-
-                  <div className="flex items-center gap-1">
-                    {editingId === factory._id ? (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={handleUpdate}>
-                          <Check className="h-4 w-4 text-green-600" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setEditingId(null)}
-                        >
-                          <X className="h-4 w-4 text-gray-400" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => startEdit(factory)}
-                        >
-                          <Edit2 className="h-4 w-4 text-gray-400" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDelete(factory._id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-400" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
                 </div>
-
-                {/* 비용 항목 (펼침 상태일 때만) */}
-                {expandedId === factory._id && (
-                  <div className="px-3 pb-3">
-                    <FactoryCostItemsManager
-                      factoryId={factory._id as Id<"factories">}
-                      currency={factory.currency}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <p className="text-sm text-gray-400 text-center py-4">

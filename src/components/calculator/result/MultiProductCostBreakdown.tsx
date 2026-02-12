@@ -220,7 +220,7 @@ export function MultiProductCostBreakdown({
                         <span className="text-sm font-bold text-green-600">
                           {formatNumberWithCommas(Math.round(productResult.unitCost * (marginRates.get(productResult.productId) ?? 200) / 100))}원
                         </span>
-                        <span className="text-xs text-gray-400">(VAT 미포함)</span>
+                        <span className="text-xs text-gray-400">(마진 포함)</span>
                       </div>
                       <div className="text-xs text-gray-500">
                         총 {formatNumberWithCommas(productResult.totalCost)}원
@@ -381,12 +381,6 @@ export function MultiProductCostBreakdown({
                         )
                       })()}
 
-                      {/* 5. 관세 부가세 */}
-                      <CostRow
-                        label="국외 부가세"
-                        value={productResult.vatAmount}
-                        subLabel="10%"
-                      />
                     </div>
 
                     {/* ===== 가로선 1 ===== */}
@@ -443,19 +437,6 @@ export function MultiProductCostBreakdown({
                       />
                     </div>
 
-                    {/* ===== 가로선 3 ===== */}
-                    <div className="border-t border-gray-200 my-1" />
-
-                    {/* ===== 섹션 4: 국내 부가세 ===== */}
-                    <div className="space-y-1 py-2">
-                      {/* 13. 국내 부가세 */}
-                      {productResult.sharedCosts.domesticVat > 0 && (
-                        <CostRow
-                          label="국내 부가세"
-                          value={productResult.sharedCosts.domesticVat}
-                        />
-                      )}
-                    </div>
                       </div>
                     </motion.div>
                   )}
@@ -606,11 +587,9 @@ function TotalCostBreakdown({
   const remittanceFee = result.sharedCostsTotal.remittanceFee
   const productSectionTotal = productCostTotal + additionalCostTotal + inlandShippingTotal + remittanceFee
 
-  // 2. 세금 섹션 (관세 + 국외 부가세)
+  // 2. 세금 섹션 (관세)
   const tariffTotal = result.breakdown.tariff
-  // 국외 부가세 = 각 제품의 vatAmount 합계 (관세 관련 부가세)
-  const foreignVatTotal = result.products.reduce((sum, p) => sum + p.vatAmount, 0)
-  const taxSectionTotal = tariffTotal + foreignVatTotal
+  const taxSectionTotal = tariffTotal
 
   // 3. 국제 물류 섹션 (송금 수수료 제외)
   const internationalShipping = result.sharedCostsTotal.internationalShipping
@@ -630,11 +609,6 @@ function TotalCostBreakdown({
   const domesticShipping = result.sharedCostsTotal.domesticShipping
   const threePL = result.sharedCostsTotal.threePL
   const domesticSectionTotal = customsClearanceFee + domesticShipping + threePL
-
-  // 5. 부가세 섹션 (국내 부가세)
-  // 국내 부가세 = 각 제품의 domesticVat 합계
-  const domesticVatTotal = result.products.reduce((sum, p) => sum + p.sharedCosts.domesticVat, 0)
-  const vatSectionTotal = domesticVatTotal
 
   // 총 비용
   const totalCost = result.totalCost
@@ -701,7 +675,6 @@ function TotalCostBreakdown({
           percentage={getPercentage(taxSectionTotal)}
         >
           <SectionCostRow label="관세" value={tariffTotal} />
-          <SectionCostRow label="국외 부가세 (10%)" value={foreignVatTotal} />
         </CostSection>
 
         {/* ===== 섹션 3: 국제 물류 ===== */}
@@ -737,14 +710,6 @@ function TotalCostBreakdown({
           />
         </CostSection>
 
-        {/* ===== 섹션 5: 부가세 ===== */}
-        <CostSection
-          title="부가세"
-          sectionTotal={vatSectionTotal}
-          percentage={getPercentage(vatSectionTotal)}
-        >
-          <SectionCostRow label="국내 부가세 (10%)" value={vatSectionTotal} />
-        </CostSection>
       </div>
     </div>
   )

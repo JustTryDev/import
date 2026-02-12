@@ -18,6 +18,7 @@ import {
   useAutoSeed,
   useFactoryPresets,
   useCostSettings,
+  useCompanyWarehouses,
 } from "@/hooks"
 import {
   calculateMultiProductImportCost,
@@ -32,6 +33,7 @@ import {
   CompanyCostSelector,
   ProductList,
   createEmptyProduct,
+  RouteSelector,
 } from "./input"
 import { FactorySlot, createEmptySlots } from "./input/AdditionalCostInput"
 
@@ -82,6 +84,11 @@ export function ImportCalculator() {
   const { factories, isLoading: factoriesLoading } = useFactories()
   const { costItemsMap: factoryCostItemsMap, isLoading: factoryCostItemsLoading } = useAllFactoryCostItems()
 
+  // ===== 운송 경로 (출발지/도착지) =====
+  const { warehouses, isLoading: warehousesLoading } = useCompanyWarehouses(selectedCompanyId)
+  const [selectedRouteFactoryId, setSelectedRouteFactoryId] = useState<string | null>(null)
+  const [selectedRouteWarehouseId, setSelectedRouteWarehouseId] = useState<string | null>(null)
+
   // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL) =====
   const { inlandConfig, domesticConfig, threePLConfig } = useCostSettings()
 
@@ -124,9 +131,10 @@ export function ImportCalculator() {
     }
   }, [rateTypes, defaultRateType, selectedRateTypeId])
 
-  // 업체 변경 시 공통 비용 초기화
+  // 업체 변경 시 공통 비용 및 도착지 초기화
   useEffect(() => {
     setSelectedCompanyCostIds([])
+    setSelectedRouteWarehouseId(null)
   }, [selectedCompanyId])
 
   // 필수 공통 비용 자동 선택
@@ -263,7 +271,6 @@ export function ImportCalculator() {
           name: item.name,
           amount: item.defaultAmount,
           isDivisible: item.isDivisible,
-          isVatApplicable: item.isVatApplicable ?? false,
         }
       })
       .filter((c): c is NonNullable<typeof c> => c !== null)
@@ -408,7 +415,24 @@ export function ImportCalculator() {
               />
             </motion.div>
 
-            {/* 2. 제품 목록 (다중 제품 입력) */}
+            {/* 2. 운송 경로 (출발지/도착지) */}
+            <motion.div
+              variants={itemVariants}
+              className="bg-white rounded-lg border border-gray-200 p-3"
+            >
+              <RouteSelector
+                factories={factories}
+                selectedFactoryId={selectedRouteFactoryId}
+                onFactoryChange={setSelectedRouteFactoryId}
+                warehouses={warehouses}
+                selectedWarehouseId={selectedRouteWarehouseId}
+                onWarehouseChange={setSelectedRouteWarehouseId}
+                companyName={companies?.find((c) => c._id === selectedCompanyId)?.name}
+                isLoading={factoriesLoading || warehousesLoading}
+              />
+            </motion.div>
+
+            {/* 3. 제품 목록 (다중 제품 입력) */}
             <motion.div
               variants={itemVariants}
               className="bg-white rounded-lg border border-gray-200 p-3"
@@ -420,7 +444,7 @@ export function ImportCalculator() {
               />
             </motion.div>
 
-            {/* 3. 중국 공장 추가 비용 */}
+            {/* 4. 중국 공장 추가 비용 */}
             <motion.div
               variants={itemVariants}
               className="bg-white rounded-lg border border-gray-200 p-3"
@@ -442,7 +466,7 @@ export function ImportCalculator() {
               />
             </motion.div>
 
-            {/* 4. [국제 운송 회사] [업체별 공통 비용] - 2열 그리드 */}
+            {/* 5. [국제 운송 회사] [업체별 공통 비용] - 2열 그리드 */}
             <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-lg border border-gray-200 p-3">
                 <ShippingCompanySelector

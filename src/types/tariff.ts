@@ -109,8 +109,6 @@ export interface ImportCostResult {
 
   // 과세 및 최종 금액
   taxablePrice: number       // 과세가격 (제품가격 + 관세)
-  vatRate: number            // 부가세율 (10%)
-  vatAmount: number          // 부가세 (KRW)
   totalCost: number          // 총 수입원가 (KRW)
 }
 

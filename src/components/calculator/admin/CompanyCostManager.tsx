@@ -36,7 +36,6 @@ export function CompanyCostManager() {
   const [newAmount, setNewAmount] = useState("")
   const [newIsDivisible, setNewIsDivisible] = useState(true)
   const [newIsRequired, setNewIsRequired] = useState(false)
-  const [newIsVatApplicable, setNewIsVatApplicable] = useState(false)  // 부가세 적용 여부
 
   // 수정 상태
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -44,7 +43,6 @@ export function CompanyCostManager() {
   const [editAmount, setEditAmount] = useState("")
   const [editIsDivisible, setEditIsDivisible] = useState(true)
   const [editIsRequired, setEditIsRequired] = useState(false)
-  const [editIsVatApplicable, setEditIsVatApplicable] = useState(false)  // 부가세 적용 여부
 
   // 첫 번째 업체 자동 선택
   useEffect(() => {
@@ -65,14 +63,12 @@ export function CompanyCostManager() {
       defaultAmount: amount,
       isDivisible: newIsDivisible,
       isRequired: newIsRequired,
-      isVatApplicable: newIsVatApplicable,  // 부가세 적용 여부
       sortOrder: (items?.length ?? 0) + 1,
     })
     setNewName("")
     setNewAmount("")
     setNewIsDivisible(true)
     setNewIsRequired(false)
-    setNewIsVatApplicable(false)
     setIsAdding(false)
   }
 
@@ -83,7 +79,6 @@ export function CompanyCostManager() {
     setEditAmount(item.defaultAmount.toString())
     setEditIsDivisible(item.isDivisible)
     setEditIsRequired(item.isRequired)
-    setEditIsVatApplicable(item.isVatApplicable ?? false)  // 부가세 적용 여부
   }
 
   // 수정 저장
@@ -98,7 +93,6 @@ export function CompanyCostManager() {
       defaultAmount: amount,
       isDivisible: editIsDivisible,
       isRequired: editIsRequired,
-      isVatApplicable: editIsVatApplicable,  // 부가세 적용 여부
     })
     setEditingId(null)
   }
@@ -187,16 +181,6 @@ export function CompanyCostManager() {
                     필수 항목
                   </Label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="newIsVatApplicable"
-                    checked={newIsVatApplicable}
-                    onCheckedChange={(v) => setNewIsVatApplicable(v as boolean)}
-                  />
-                  <Label htmlFor="newIsVatApplicable" className="text-sm text-gray-600">
-                    부가세 적용
-                  </Label>
-                </div>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleAdd}>
@@ -269,19 +253,6 @@ export function CompanyCostManager() {
                             필수 항목
                           </Label>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id={`edit-vat-${item._id}`}
-                            checked={editIsVatApplicable}
-                            onCheckedChange={(v) => setEditIsVatApplicable(v as boolean)}
-                          />
-                          <Label
-                            htmlFor={`edit-vat-${item._id}`}
-                            className="text-sm text-gray-600"
-                          >
-                            부가세 적용
-                          </Label>
-                        </div>
                       </div>
                     </div>
                   ) : (
@@ -296,11 +267,6 @@ export function CompanyCostManager() {
                         {item.isRequired && (
                           <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded">
                             필수
-                          </span>
-                        )}
-                        {item.isVatApplicable && (
-                          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">
-                            부가세
                           </span>
                         )}
                       </div>

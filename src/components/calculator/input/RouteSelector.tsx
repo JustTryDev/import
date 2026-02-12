@@ -10,12 +10,14 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { MapPin, ArrowRight, Settings } from "lucide-react"
+import { MapPin, ArrowRight, Settings, Anchor, AlertTriangle } from "lucide-react"
 import {
   formatFullAddress,
   getCityCoordinates,
   calculateDistance,
 } from "@/data/chinaRegions"
+import { CHINESE_PORTS, getPortById } from "@/data/chinesePorts"
+import type { PortWithDistance } from "@/data/chinesePorts"
 import RouteMap from "./RouteMap"
 import { Id } from "../../../../convex/_generated/dataModel"
 
@@ -76,6 +78,17 @@ interface RouteSelectorProps {
   onSettingsClick?: () => void
 
   isLoading?: boolean
+
+  // FCL 항구 선택 (컨테이너 모드)
+  containerMode?: boolean
+  selectedPortId?: string | null
+  onPortChange?: (portId: string) => void
+  nearestPorts?: PortWithDistance[]
+  portDistanceKm?: number | null
+  portRoadDistanceKm?: number | null
+  onPortRoadDistanceChange?: (km: number | null) => void
+  // 오버플로우 여부 (FCL에서 컨테이너에 안 들어간 잔량이 LCL로 가는 경우)
+  hasOverflow?: boolean
 }
 
 // 운송 경로 통합 선택 컴포넌트
@@ -96,6 +109,14 @@ export function RouteSelector({
   onRateTypeChange,
   onSettingsClick,
   isLoading,
+  containerMode = false,
+  selectedPortId,
+  onPortChange,
+  nearestPorts = [],
+  portDistanceKm,
+  portRoadDistanceKm,
+  onPortRoadDistanceChange,
+  hasOverflow = false,
 }: RouteSelectorProps) {
   // 실제 도로 거리 (Directions API 결과, km)
   const [roadDistanceKm, setRoadDistanceKm] = useState<number | null>(null)
@@ -143,18 +164,50 @@ export function RouteSelector({
     return { ...coord, label: `${selectedWarehouse.name} (${destinationAddress ?? ""})` }
   }, [selectedWarehouse, destinationAddress])
 
+  // 선택된 항구 정보 (FCL 모드)
+  const selectedPort = useMemo(() => {
+    if (!selectedPortId) return null
+    return getPortById(selectedPortId) ?? null
+  }, [selectedPortId])
+
+  // FCL 모드: 선택된 항구의 좌표 (지도 표시용)
+  const portCoord = useMemo(() => {
+    if (!selectedPort) return null
+    return { lat: selectedPort.lat, lng: selectedPort.lng, label: `${selectedPort.nameKo} (${selectedPort.nameCn})` }
+  }, [selectedPort])
+
+  // FCL 모드: 항구 마커 목록 (지도에 표시용)
+  const portMarkers = useMemo(() => {
+    if (!containerMode) return []
+    // 가까운 항구 5개를 마커로 변환
+    return nearestPorts.map((port) => ({
+      id: port.id,
+      lat: port.lat,
+      lng: port.lng,
+      label: `${port.nameKo} (${port.nameCn}) ~${port.distanceKm}km`,
+      isSelected: port.id === selectedPortId,
+    }))
+  }, [containerMode, nearestPorts, selectedPortId])
+
   // 직선 거리 (Haversine, fallback용)
   const straightDistanceKm = useMemo(() => {
     if (!departureCoord || !destinationCoord) return null
     return calculateDistance(departureCoord, destinationCoord)
   }, [departureCoord, destinationCoord])
 
-  // 표시할 거리: 실제 도로 거리 우선, 없으면 직선 거리 fallback
-  const displayDistance = roadDistanceKm ?? straightDistanceKm
-  const distancePrefix = roadDistanceKm !== null ? "" : "~"
+  // 표시할 거리: 모드에 따라 다른 소스 사용
+  // LCL: 공장→창고 거리, FCL: 공장→항구 거리
+  const displayDistance: number | null = containerMode
+    ? (portRoadDistanceKm ?? portDistanceKm ?? null)
+    : (roadDistanceKm ?? straightDistanceKm)
+  const distancePrefix = containerMode
+    ? (portRoadDistanceKm != null ? "" : "~")
+    : (roadDistanceKm !== null ? "" : "~")
 
-  // 지도 표시 여부 (출발지 또는 도착지 중 하나라도 선택 시)
-  const showMap = departureCoord || destinationCoord
+  // 지도 표시 여부
+  const showMap = containerMode
+    ? (departureCoord !== null)  // FCL: 공장만 선택되면 지도 표시 (항구 마커도 함께)
+    : (departureCoord || destinationCoord)  // LCL: 기존 로직
 
   // 도로 거리 콜백 (RouteMap에서 호출)
   const handleDistanceChange = useCallback((km: number | null) => {
@@ -225,113 +278,286 @@ export function RouteSelector({
         </Select>
       </div>
 
-      {/* 2행: 업체 → 도착지(창고) → 운임 타입 */}
-      <div className={`grid ${showRateTypes ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
-        {/* 운송 업체 선택 */}
-        <div className="min-w-0">
-          <Label className="text-xs text-gray-500">운송 업체</Label>
-          <Select
-            value={selectedCompanyId ?? undefined}
-            onValueChange={(v) => onCompanyChange(v as Id<"shippingCompanies">)}
-            disabled={isLoading || !companies?.length}
-          >
-            <SelectTrigger className="mt-1 w-full">
-              <SelectValue placeholder="업체 선택" className="truncate" />
-            </SelectTrigger>
-            <SelectContent>
-              {companies?.map((company) => (
-                <SelectItem key={company._id} value={company._id} className="truncate">
-                  <span className="truncate">{company.name}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* 도착지 (창고) 선택 */}
-        <div className="min-w-0">
-          <Label className="text-xs text-gray-500">도착지</Label>
-          <Select
-            value={selectedWarehouseId ?? undefined}
-            onValueChange={(v) => handleWarehouseChange(v)}
-            disabled={isLoading || !warehouses?.length}
-          >
-            <SelectTrigger className="mt-1 w-full">
-              <SelectValue
-                placeholder={warehouses?.length ? "창고 선택" : "창고 없음"}
-                className="truncate"
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {warehouses?.map((warehouse) => (
-                <SelectItem key={warehouse._id} value={warehouse._id} className="truncate">
-                  <span className="truncate">{formatWarehouseOption(warehouse)}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* 운임 타입 선택 (창고 선택 후 표시) */}
-        {showRateTypes && (
-          <div className="min-w-0">
-            <Label className="text-xs text-gray-500">운임 타입</Label>
+      {/* 2행: 모드에 따라 다른 UI */}
+      {containerMode ? (
+        // ===== FCL 모드: 출발 항구 선택 =====
+        // 📌 비유: 이삿짐 트럭은 택배 회사/물류센터가 필요 없고, 항구만 선택하면 됨
+        <>
+          <div>
+            <Label className="text-xs text-gray-500 flex items-center gap-1">
+              <Anchor className="h-3 w-3" />
+              도착항 (FCL)
+            </Label>
             <Select
-              value={selectedRateTypeId ?? undefined}
-              onValueChange={(v) => onRateTypeChange(v as Id<"shippingRateTypes">)}
+              value={selectedPortId ?? undefined}
+              onValueChange={(v) => onPortChange?.(v)}
             >
               <SelectTrigger className="mt-1 w-full">
-                <SelectValue placeholder="운임 타입 선택" className="truncate" />
+                <SelectValue placeholder="항구 선택" className="truncate" />
               </SelectTrigger>
               <SelectContent>
-                {rateTypes?.map((type) => (
-                  <SelectItem key={type._id} value={type._id} className="truncate">
-                    <span className="truncate">
-                      {type.name}
-                      {/* 단위 타입 배지 (CBM/KG 구분) */}
-                      <span className={`text-[10px] ml-1.5 px-1 py-0.5 rounded ${
-                        type.unitType === "kg"
-                          ? "bg-orange-100 text-orange-600"
-                          : "bg-blue-100 text-blue-600"
-                      }`}>
-                        {type.unitType === "kg" ? "KG" : "CBM"}
-                      </span>
-                      {type.description && (
-                        <span className="text-xs text-gray-400 ml-1">
-                          ({type.description})
+                {/* 가까운 항구 (추천) */}
+                {nearestPorts.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-medium text-gray-400 uppercase">
+                      가까운 항구
+                    </div>
+                    {nearestPorts.map((port) => (
+                      <SelectItem key={port.id} value={port.id} className="truncate">
+                        <span className="truncate">
+                          {port.nameKo} ({port.nameCn})
+                          <span className="text-xs text-gray-400 ml-1">~{port.distanceKm}km</span>
                         </span>
-                      )}
-                    </span>
+                      </SelectItem>
+                    ))}
+                    <div className="border-t border-gray-100 my-1" />
+                    <div className="px-2 py-1 text-[10px] font-medium text-gray-400 uppercase">
+                      전체 항구
+                    </div>
+                  </>
+                )}
+                {/* 전체 항구 목록 (가까운 항구에 없는 것만) */}
+                {CHINESE_PORTS
+                  .filter((port) => !nearestPorts.some((np) => np.id === port.id))
+                  .map((port) => (
+                    <SelectItem key={port.id} value={port.id} className="truncate">
+                      <span className="truncate">
+                        {port.nameKo} ({port.nameCn})
+                        <span className="text-[10px] text-gray-400 ml-1">{port.region}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 📌 LCL 오버플로우 경로 설정
+              비유: 이삿짐 트럭(FCL)에 다 안 들어가면 나머지는 택배(LCL)로 보냄
+              → LCL로 보내려면 택배 회사, 물류센터, 요금제를 선택해야 함 */}
+          {hasOverflow && (
+            <div className="mt-3 pt-3 border-t border-dashed border-amber-200">
+              <div className="flex items-center gap-1.5 mb-2">
+                <AlertTriangle className="h-3 w-3 text-amber-500" />
+                <span className="text-xs text-amber-600 font-medium">LCL 오버플로우 경로</span>
+              </div>
+              <div className={`grid ${showRateTypes ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
+                {/* 운송 업체 */}
+                <div className="min-w-0">
+                  <Label className="text-xs text-gray-500">운송 업체</Label>
+                  <Select
+                    value={selectedCompanyId ?? undefined}
+                    onValueChange={(v) => onCompanyChange(v as Id<"shippingCompanies">)}
+                    disabled={isLoading || !companies?.length}
+                  >
+                    <SelectTrigger className="mt-1 w-full">
+                      <SelectValue placeholder="업체 선택" className="truncate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies?.map((company) => (
+                        <SelectItem key={company._id} value={company._id} className="truncate">
+                          <span className="truncate">{company.name}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 도착지 (창고) */}
+                <div className="min-w-0">
+                  <Label className="text-xs text-gray-500">도착지</Label>
+                  <Select
+                    value={selectedWarehouseId ?? undefined}
+                    onValueChange={(v) => handleWarehouseChange(v)}
+                    disabled={isLoading || !warehouses?.length}
+                  >
+                    <SelectTrigger className="mt-1 w-full">
+                      <SelectValue
+                        placeholder={warehouses?.length ? "창고 선택" : "창고 없음"}
+                        className="truncate"
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses?.map((warehouse) => (
+                        <SelectItem key={warehouse._id} value={warehouse._id} className="truncate">
+                          <span className="truncate">{formatWarehouseOption(warehouse)}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 운임 타입 (창고 선택 후 표시) */}
+                {showRateTypes && (
+                  <div className="min-w-0">
+                    <Label className="text-xs text-gray-500">운임 타입</Label>
+                    <Select
+                      value={selectedRateTypeId ?? undefined}
+                      onValueChange={(v) => onRateTypeChange(v as Id<"shippingRateTypes">)}
+                    >
+                      <SelectTrigger className="mt-1 w-full">
+                        <SelectValue placeholder="운임 타입 선택" className="truncate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {rateTypes?.map((type) => (
+                          <SelectItem key={type._id} value={type._id} className="truncate">
+                            <span className="truncate">
+                              {type.name}
+                              <span className={`text-[10px] ml-1.5 px-1 py-0.5 rounded ${
+                                type.unitType === "kg"
+                                  ? "bg-orange-100 text-orange-600"
+                                  : "bg-blue-100 text-blue-600"
+                              }`}>
+                                {type.unitType === "kg" ? "KG" : "CBM"}
+                              </span>
+                              {type.description && (
+                                <span className="text-xs text-gray-400 ml-1">
+                                  ({type.description})
+                                </span>
+                              )}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        // ===== LCL 모드: 기존 업체 → 창고 → 운임타입 =====
+        <div className={`grid ${showRateTypes ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
+          {/* 운송 업체 선택 */}
+          <div className="min-w-0">
+            <Label className="text-xs text-gray-500">운송 업체</Label>
+            <Select
+              value={selectedCompanyId ?? undefined}
+              onValueChange={(v) => onCompanyChange(v as Id<"shippingCompanies">)}
+              disabled={isLoading || !companies?.length}
+            >
+              <SelectTrigger className="mt-1 w-full">
+                <SelectValue placeholder="업체 선택" className="truncate" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies?.map((company) => (
+                  <SelectItem key={company._id} value={company._id} className="truncate">
+                    <span className="truncate">{company.name}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        )}
-      </div>
 
-      {/* Google Maps 지도 (출발지 또는 도착지가 선택된 경우) */}
+          {/* 도착지 (창고) 선택 */}
+          <div className="min-w-0">
+            <Label className="text-xs text-gray-500">도착지</Label>
+            <Select
+              value={selectedWarehouseId ?? undefined}
+              onValueChange={(v) => handleWarehouseChange(v)}
+              disabled={isLoading || !warehouses?.length}
+            >
+              <SelectTrigger className="mt-1 w-full">
+                <SelectValue
+                  placeholder={warehouses?.length ? "창고 선택" : "창고 없음"}
+                  className="truncate"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses?.map((warehouse) => (
+                  <SelectItem key={warehouse._id} value={warehouse._id} className="truncate">
+                    <span className="truncate">{formatWarehouseOption(warehouse)}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 운임 타입 선택 (창고 선택 후 표시) */}
+          {showRateTypes && (
+            <div className="min-w-0">
+              <Label className="text-xs text-gray-500">운임 타입</Label>
+              <Select
+                value={selectedRateTypeId ?? undefined}
+                onValueChange={(v) => onRateTypeChange(v as Id<"shippingRateTypes">)}
+              >
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="운임 타입 선택" className="truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rateTypes?.map((type) => (
+                    <SelectItem key={type._id} value={type._id} className="truncate">
+                      <span className="truncate">
+                        {type.name}
+                        <span className={`text-[10px] ml-1.5 px-1 py-0.5 rounded ${
+                          type.unitType === "kg"
+                            ? "bg-orange-100 text-orange-600"
+                            : "bg-blue-100 text-blue-600"
+                        }`}>
+                          {type.unitType === "kg" ? "KG" : "CBM"}
+                        </span>
+                        {type.description && (
+                          <span className="text-xs text-gray-400 ml-1">
+                            ({type.description})
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Google Maps 지도 */}
       {showMap && (
         <RouteMap
           departure={departureCoord}
-          destination={destinationCoord}
-          onDistanceChange={handleDistanceChange}
+          // FCL 모드: 선택된 항구를 도착지로 사용 / LCL 모드: 기존 창고
+          destination={containerMode ? portCoord : destinationCoord}
+          onDistanceChange={containerMode ? (onPortRoadDistanceChange ?? (() => {})) : handleDistanceChange}
+          // FCL 모드: 항구 마커 목록 전달
+          ports={containerMode ? portMarkers : undefined}
+          onPortClick={containerMode ? onPortChange : undefined}
         />
       )}
 
-      {/* 경로 요약 + 거리 (출발지 + 도착지 모두 선택 시) */}
-      {departureAddress && destinationAddress && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm">
-          <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-          <span className="text-gray-600 truncate">{departureAddress}</span>
-          <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-          <span className="text-gray-600 truncate">{destinationAddress}</span>
-          {displayDistance !== null && (
-            <span className="text-gray-500 shrink-0 ml-auto font-medium">
-              {distancePrefix}{Math.round(displayDistance).toLocaleString()}km
+      {/* 경로 요약 + 거리 */}
+      {containerMode ? (
+        // FCL 모드: 공장 → 항구
+        departureAddress && selectedPort && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg text-sm">
+            <MapPin className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+            <span className="text-gray-600 truncate">{departureAddress}</span>
+            <ArrowRight className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+            <span className="text-blue-600 font-medium truncate flex items-center gap-1">
+              <Anchor className="h-3 w-3" />
+              {selectedPort.nameKo}
             </span>
-          )}
-        </div>
+            {displayDistance !== null && (
+              <span className="text-blue-500 shrink-0 ml-auto font-medium">
+                {distancePrefix}{Math.round(displayDistance).toLocaleString()}km
+              </span>
+            )}
+          </div>
+        )
+      ) : (
+        // LCL 모드: 공장 → 창고
+        departureAddress && destinationAddress && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm">
+            <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <span className="text-gray-600 truncate">{departureAddress}</span>
+            <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <span className="text-gray-600 truncate">{destinationAddress}</span>
+            {displayDistance !== null && (
+              <span className="text-gray-500 shrink-0 ml-auto font-medium">
+                {distancePrefix}{Math.round(displayDistance).toLocaleString()}km
+              </span>
+            )}
+          </div>
+        )
       )}
     </div>
   )

@@ -10,6 +10,8 @@ import {
   Receipt,
   Divide,
   ArrowRight,
+  AlertTriangle,
+  Star,
 } from "lucide-react"
 import {
   Select,
@@ -21,6 +23,7 @@ import {
 import type {
   Product,
   MultiProductCalculationResult,
+  ContainerOptionSummary,
 } from "@/types/shipping"
 import type { FactorySlot } from "../input/AdditionalCostInput"
 import type {
@@ -28,6 +31,11 @@ import type {
   DomesticShippingConfig,
   ThreePLCostConfig,
 } from "@/lib/calculations"
+import type {
+  ContainerConfig,
+  ContainerType,
+  DeliveryMethod,
+} from "@/lib/calculations/container"
 
 interface MultiProductCostBreakdownProps {
   result: MultiProductCalculationResult | null
@@ -41,6 +49,16 @@ interface MultiProductCostBreakdownProps {
     threePL?: ThreePLCostConfig
   }
   orderCount?: number  // 주문 건수 (공통 비용 분배 표시용)
+
+  // 컨테이너(FCL) 모드 props
+  containerMode?: boolean
+  onContainerModeChange?: (mode: boolean) => void
+  deliveryMethod?: DeliveryMethod
+  onDeliveryMethodChange?: (method: DeliveryMethod) => void
+  containerConfig?: ContainerConfig
+  onContainerConfigChange?: (overrides: Partial<
+    Record<ContainerType, Partial<ContainerConfig[ContainerType]>>
+  >) => void
 }
 
 /**
@@ -59,12 +77,21 @@ export function MultiProductCostBreakdown({
   factorySlots,
   costSettings,
   orderCount = 1,
+  containerMode = false,
+  onContainerModeChange,
+  deliveryMethod = "via3PL",
+  onDeliveryMethodChange,
+  containerConfig,
+  onContainerConfigChange,
 }: MultiProductCostBreakdownProps) {
   // 제품별 상세 펼침/접힘 상태
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
 
   // 제품별 마진율 상태 (기본값: 50% = 내부값 150)
   const [marginRates, setMarginRates] = useState<Map<string, number>>(new Map())
+
+  // 컨테이너 다른 옵션 비교 펼침/접힘
+  const [showAllContainerOptions, setShowAllContainerOptions] = useState(false)
 
   // 원화 → 외화 역산 함수
   const toForeignCurrency = (krw: number, currency: "USD" | "CNY") => {
@@ -133,6 +160,9 @@ export function MultiProductCostBreakdown({
     }
     return "1R.TON (CBM)당 50,000원"
   }
+
+  // 컨테이너 비교 데이터
+  const containerComparison = result.containerComparison
 
   return (
     <div className="space-y-3">
@@ -493,6 +523,32 @@ export function MultiProductCostBreakdown({
         </div>
       </div>
 
+      {/* LCL/FCL 운송 모드 탭 (총 비용 내역 바로 위) */}
+      <div className="flex justify-center">
+        <div className="inline-flex items-center bg-gray-100 rounded-full p-1">
+          <button
+            onClick={() => onContainerModeChange?.(false)}
+            className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+              !containerMode
+                ? "bg-gray-900 text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            LCL
+          </button>
+          <button
+            onClick={() => onContainerModeChange?.(true)}
+            className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+              containerMode
+                ? "bg-gray-900 text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            FCL
+          </button>
+        </div>
+      </div>
+
       {/* 총 비용 내역 (프로그레스 스택) */}
       <TotalCostBreakdown
         result={result}
@@ -502,6 +558,12 @@ export function MultiProductCostBreakdown({
         cnyRate={cnyRate}
         costSettings={costSettings}
         orderCount={orderCount}
+        containerMode={containerMode}
+        containerComparison={containerComparison ?? undefined}
+        deliveryMethod={deliveryMethod}
+        onDeliveryMethodChange={onDeliveryMethodChange}
+        showAllContainerOptions={showAllContainerOptions}
+        onToggleContainerOptions={() => setShowAllContainerOptions(!showAllContainerOptions)}
       />
     </div>
   )
@@ -608,6 +670,12 @@ function TotalCostBreakdown({
   cnyRate,
   costSettings,
   orderCount = 1,
+  containerMode = false,
+  containerComparison,
+  deliveryMethod = "via3PL",
+  onDeliveryMethodChange,
+  showAllContainerOptions = false,
+  onToggleContainerOptions,
 }: {
   result: MultiProductCalculationResult
   products: Product[]
@@ -620,6 +688,21 @@ function TotalCostBreakdown({
     threePL?: ThreePLCostConfig
   }
   orderCount?: number
+  containerMode?: boolean
+  containerComparison?: {
+    isContainerMode: boolean
+    selectedOption: ContainerOptionSummary
+    allOptions: ContainerOptionSummary[]
+    lclTotalShipping: number
+    fclTotalShipping: number
+    savings: number
+    savingsPercent: number
+    deliveryMethod: "direct" | "via3PL"
+  }
+  deliveryMethod?: DeliveryMethod
+  onDeliveryMethodChange?: (method: DeliveryMethod) => void
+  showAllContainerOptions?: boolean
+  onToggleContainerOptions?: () => void
 }) {
   // 원화 → USD 역산
   const toUSD = (krw: number) => {
@@ -655,18 +738,37 @@ function TotalCostBreakdown({
   const companyCostsWithoutCustomsTotal = companyCostsWithoutCustoms.reduce(
     (sum, item) => sum + item.dividedAmount, 0
   )
-  const internationalSectionTotal = internationalShipping + companyCostsWithoutCustomsTotal
+
+  // 📌 오버플로우 여부: FCL에서 컨테이너에 다 안 들어가면 나머지를 LCL로 보냄
+  //    이 경우 통관이 2번 발생 → D/O, C/O, 통관 수수료가 한 번씩 추가
+  const hasOverflow = !!(containerMode && containerComparison?.selectedOption.hasOverflow)
+
+  // FCL 모드: 국제 물류 = 국제운송 + 내륙운송 + D/O, C/O (국내운송/3PL은 하단 섹션)
+  // 오버플로우 시: D/O, C/O가 2회 발생 (컨테이너 1회 + LCL 1회)
+  // LCL 모드: 기존 국제 운송료 + D/O, C/O
+  const fclInternationalOnly = containerComparison
+    ? (containerComparison.selectedOption.containerShippingCost + containerComparison.selectedOption.containerInlandCost)
+    : 0
+  const companyCostsMultiplier = hasOverflow ? 2 : 1
+  const internationalSectionTotal = containerMode && containerComparison
+    ? fclInternationalOnly + companyCostsWithoutCustomsTotal * companyCostsMultiplier
+    : internationalShipping + companyCostsWithoutCustomsTotal
 
   // 4. 국내 통관 및 물류 섹션
-  // 통관 수수료
+  // 통관 수수료 (오버플로우 시 2회 발생)
   const customsClearanceItem = result.companyCostsDetail?.find(item => item.name.includes('통관'))
   const customsClearanceFee = customsClearanceItem?.dividedAmount || 0
+  const customsClearanceMultiplier = hasOverflow ? 2 : 1
   const domesticShipping = result.sharedCostsTotal.domesticShipping
   const threePL = result.sharedCostsTotal.threePL
-  const domesticSectionTotal = customsClearanceFee + domesticShipping + threePL
+  const domesticSectionTotal = customsClearanceFee * customsClearanceMultiplier + domesticShipping + threePL
 
-  // 총 비용
-  const totalCost = result.totalCost
+  // 총 비용 (오버플로우 시 추가 통관 비용 반영)
+  // 📌 비유: 택배를 2번 보내면 택배비뿐 아니라 접수비(통관)도 2번 내야 하는 것
+  const overflowExtraCosts = hasOverflow
+    ? companyCostsWithoutCustomsTotal + customsClearanceFee
+    : 0
+  const totalCost = result.totalCost + overflowExtraCosts
 
   // 송금 수수료 기준 금액 (제품가격 + 공장비용 + 내륙운송료)
   const remittanceFeeBase = productCostTotal + additionalCostTotal + inlandShippingTotal
@@ -772,13 +874,168 @@ function TotalCostBreakdown({
           sectionTotal={internationalSectionTotal}
           percentage={getPercentage(internationalSectionTotal)}
         >
-          <SectionCostRow
-            label={`국제 운송료 (${result.totalCbm.toFixed(2)} R.TON (CBM) → ${result.roundedCbm.toFixed(1)} R.TON (CBM) 적용)`}
-            value={internationalShipping}
-            foreignValue={formatUSD(toUSD(internationalShipping))}
-          />
+          {containerMode && containerComparison ? (
+            <>
+              {/* FCL 모드: 컨테이너 추천 + 비용 상세 */}
+              <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100 mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs font-semibold text-blue-700">
+                    추천: {containerComparison.selectedOption.label}
+                  </span>
+                  {containerComparison.selectedOption.hasOverflow && (
+                    <span className="text-[10px] text-blue-500 bg-blue-100 px-1.5 py-0.5 rounded">
+                      + LCL {containerComparison.selectedOption.overflowCbm.toFixed(1)} CBM
+                    </span>
+                  )}
+                  {containerComparison.selectedOption.weightWarning && (
+                    <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      중량 초과
+                    </span>
+                  )}
+                </div>
+
+                {/* 비용 내역 */}
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-gray-600">
+                    <span>국제 운송 (컨테이너)</span>
+                    <span className="font-medium">{formatNumberWithCommas(containerComparison.selectedOption.containerShippingCost)}원</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>내륙 운송 (컨테이너)</span>
+                    <span className="font-medium">{formatNumberWithCommas(containerComparison.selectedOption.containerInlandCost)}원</span>
+                  </div>
+                  {/* 국내 운송, 3PL 비용은 "국내 통관 및 물류" 섹션에서 표시 */}
+
+                  {/* 오버플로우 LCL 비용 (컨테이너에 안 들어간 나머지) */}
+                  {containerComparison.selectedOption.hasOverflow && (
+                    <>
+                      <div className="border-t border-blue-200 my-1" />
+                      <div className="text-blue-600 font-medium text-[10px]">
+                        + LCL 오버플로우 ({containerComparison.selectedOption.overflowCbm.toFixed(1)} CBM)
+                      </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>국제 운송 (LCL)</span>
+                        <span>{formatNumberWithCommas(containerComparison.selectedOption.overflowShippingCost)}원</span>
+                      </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>내륙 운송 (LCL)</span>
+                        <span>{formatNumberWithCommas(containerComparison.selectedOption.overflowInlandCost)}원</span>
+                      </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>국내 운송료 (LCL)</span>
+                        <span>{formatNumberWithCommas(containerComparison.selectedOption.overflowDomesticCost)}원</span>
+                      </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>3PL + 배송비 (LCL)</span>
+                        <span>{formatNumberWithCommas(containerComparison.selectedOption.overflowThreePLCost)}원</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* 적재율 */}
+                <div className="mt-2">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>적재율</span>
+                    <span>{Math.round(containerComparison.selectedOption.loadRatio * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, containerComparison.selectedOption.loadRatio * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 다른 옵션 비교 (접힘/펼침) */}
+              {containerComparison.allOptions.length > 1 && (
+                <div className="mb-2">
+                  <button
+                    onClick={onToggleContainerOptions}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    {showAllContainerOptions ? (
+                      <ChevronUp className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
+                    다른 옵션 비교 ({containerComparison.allOptions.length}개)
+                  </button>
+
+                  <AnimatePresence>
+                    {showAllContainerOptions && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-1.5 space-y-1">
+                          {containerComparison.allOptions.map((option) => (
+                            <div
+                              key={`${option.type}-${option.count}`}
+                              className={`flex items-center justify-between text-xs px-2 py-1.5 rounded-md ${
+                                option.isRecommended
+                                  ? "bg-blue-50 border border-blue-100"
+                                  : "bg-gray-50"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {option.isRecommended && (
+                                  <Star className="h-3 w-3 text-blue-500 fill-blue-500" />
+                                )}
+                                <span className={option.isRecommended ? "font-medium text-blue-700" : "text-gray-600"}>
+                                  {option.label}
+                                </span>
+                                {option.hasOverflow && (
+                                  <span className="text-[10px] text-gray-400">
+                                    +LCL {option.overflowCbm.toFixed(1)}
+                                  </span>
+                                )}
+                                {option.weightWarning && (
+                                  <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900">
+                                  {formatNumberWithCommas(option.totalShippingCost)}원
+                                </span>
+                                <span className={`text-[10px] ${
+                                  containerComparison.lclTotalShipping - option.totalShippingCost > 0
+                                    ? "text-green-600"
+                                    : "text-red-500"
+                                }`}>
+                                  {containerComparison.lclTotalShipping - option.totalShippingCost > 0 ? "-" : "+"}
+                                  {formatNumberWithCommas(Math.abs(containerComparison.lclTotalShipping - option.totalShippingCost))}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </>
+          ) : (
+            // LCL 모드: 기존 국제 운송료 표시
+            <SectionCostRow
+              label={`국제 운송료 (${result.totalCbm.toFixed(2)} R.TON (CBM) → ${result.roundedCbm.toFixed(1)} R.TON (CBM) 적용)`}
+              value={internationalShipping}
+              foreignValue={formatUSD(toUSD(internationalShipping))}
+            />
+          )}
           {companyCostsWithoutCustoms.map((item) => (
-            <SectionCostRow key={item.itemId} label={item.name} value={item.dividedAmount} />
+            <SectionCostRow
+              key={item.itemId}
+              label={hasOverflow ? `${item.name} (×2)` : item.name}
+              value={hasOverflow ? item.dividedAmount * 2 : item.dividedAmount}
+            />
           ))}
         </CostSection>
 
@@ -788,15 +1045,53 @@ function TotalCostBreakdown({
           sectionTotal={domesticSectionTotal}
           percentage={getPercentage(domesticSectionTotal)}
         >
-          <SectionCostRow label="통관 수수료" value={customsClearanceFee} />
           <SectionCostRow
-            label={`국내 운송료 (기본 ${domesticBaseCbm} R.TON (CBM), +${domesticExtraUnit} R.TON (CBM) ₩${formatNumberWithCommas(domesticExtraRate)})`}
+            label={hasOverflow ? "통관 수수료 (×2)" : "통관 수수료"}
+            value={hasOverflow ? customsClearanceFee * 2 : customsClearanceFee}
+          />
+
+          {/* FCL 모드: 배송 방식 토글 */}
+          {containerMode && (
+            <div className="flex items-center gap-2 py-1">
+              <div className="inline-flex items-center bg-gray-100 rounded-full p-0.5">
+                <button
+                  onClick={() => onDeliveryMethodChange?.("direct")}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                    deliveryMethod === "direct"
+                      ? "bg-gray-900 text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  직배송
+                </button>
+                <button
+                  onClick={() => onDeliveryMethodChange?.("via3PL")}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                    deliveryMethod === "via3PL"
+                      ? "bg-gray-900 text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  3PL 경유
+                </button>
+              </div>
+            </div>
+          )}
+
+          <SectionCostRow
+            label={containerMode
+              ? "국내 운송료 (컨테이너)"
+              : `국내 운송료 (기본 ${domesticBaseCbm} R.TON (CBM), +${domesticExtraUnit} R.TON (CBM) ₩${formatNumberWithCommas(domesticExtraRate)})`
+            }
             value={domesticShipping}
           />
-          <SectionCostRow
-            label={`3PL + 배송비 (기본 ${threePLUnit} R.TON (CBM), +${threePLUnit} R.TON (CBM) ₩${formatNumberWithCommas(threePLRate)})`}
-            value={threePL}
-          />
+          {/* FCL 직배송이면 3PL 비용 숨김, 그 외에는 항상 표시 */}
+          {!(containerMode && deliveryMethod === "direct") && (
+            <SectionCostRow
+              label={`3PL + 배송비 (기본 ${threePLUnit} R.TON (CBM), +${threePLUnit} R.TON (CBM) ₩${formatNumberWithCommas(threePLRate)})`}
+              value={threePL}
+            />
+          )}
         </CostSection>
 
       </div>

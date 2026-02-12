@@ -25,6 +25,19 @@ import {
   ShippingRateTable,
   FactorySlotInput,
 } from "@/lib/calculations"
+import {
+  ContainerConfig,
+  ContainerType,
+  DeliveryMethod,
+  DEFAULT_CONTAINER_CONFIG,
+} from "@/lib/calculations/container"
+import {
+  findNearestPorts,
+  getPortById,
+  CHINESE_PORTS,
+} from "@/data/chinesePorts"
+import type { PortWithDistance } from "@/data/chinesePorts"
+import { getCityCoordinates, calculateDistance } from "@/data/chinaRegions"
 
 // 입력 컴포넌트
 import {
@@ -94,8 +107,8 @@ export function ImportCalculator() {
   const { factories, isLoading: factoriesLoading } = useFactories()
   const { costItemsMap: factoryCostItemsMap, isLoading: factoryCostItemsLoading } = useAllFactoryCostItems()
 
-  // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL) =====
-  const { inlandConfig, domesticConfig, threePLConfig } = useCostSettings()
+  // ===== 비용 설정 (내륙운송료, 국내운송료, 3PL, 컨테이너 내륙) =====
+  const { inlandConfig, domesticConfig, threePLConfig, containerInlandConfig } = useCostSettings()
 
   // 부대 비용 슬롯 (기본 2개)
   const [factorySlots, setFactorySlots] = useState<FactorySlot[]>(() => createEmptySlots(2))
@@ -112,8 +125,57 @@ export function ImportCalculator() {
   // 주문 건수: 기본값 = 2, 제품 추가 시 +1씩 증가 (수동 조절 가능)
   const [orderCount, setOrderCount] = useState<number>(2)
 
+  // 공장 좌표 기반 가까운 항구 목록 (FCL 모드에서 사용)
+  // 📌 비유: 공장 주소를 입력하면 "가장 가까운 우체국 5곳"이 자동으로 뜨는 것
+  const nearestPorts = useMemo<PortWithDistance[]>(() => {
+    const factory = factories?.find((f) => f._id === selectedRouteFactoryId)
+    if (!factory?.cityCode) return []
+    const coord = getCityCoordinates(factory.cityCode)
+    if (!coord) return []
+    return findNearestPorts(coord, 5)
+  }, [factories, selectedRouteFactoryId])
+
   // 제품 개수가 변경되면 주문 건수 자동 업데이트 (사용자가 수동 조절하지 않은 경우)
   const [isOrderCountManual, setIsOrderCountManual] = useState(false)
+
+  // ===== 컨테이너(FCL) 모드 =====
+  // 📌 비유: "택배(LCL)" vs "이삿짐 트럭(FCL)" 전환 스위치
+  const [containerMode, setContainerMode] = useState(false)
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("via3PL")
+  // 사용자가 결과 패널에서 직접 수정한 컨테이너 비용 오버라이드
+  const [containerConfigOverrides, setContainerConfigOverrides] = useState<Partial<
+    Record<ContainerType, Partial<ContainerConfig[ContainerType]>>
+  >>({})
+
+  // ===== FCL 항구 선택 =====
+  // 📌 비유: 이삿짐 트럭(FCL)을 보낼 때 "가장 가까운 항구" 자동 선택
+  const [selectedPortId, setSelectedPortId] = useState<string | null>(null)
+  const [portDistanceKm, setPortDistanceKm] = useState<number | null>(null)        // 직선 거리 (Haversine)
+  const [portRoadDistanceKm, setPortRoadDistanceKm] = useState<number | null>(null) // 도로 거리 (Google Directions)
+
+  // 실제 계산에 사용되는 컨테이너 설정 (DB 설정 + UI 오버라이드 병합)
+  // 📌 우선순위: UI 직접 수정 > DB 저장 설정 > 기본값
+  const mergedContainerConfig = useMemo<ContainerConfig>(() => {
+    const base = DEFAULT_CONTAINER_CONFIG
+    const result = { ...base }
+    for (const type of ["20DC", "40DC", "40HC"] as ContainerType[]) {
+      // DB에서 가져온 컨테이너 내륙 설정 반영
+      const dbInland = containerInlandConfig[type]
+      if (dbInland) {
+        result[type] = {
+          ...base[type],
+          inlandMinCost: dbInland.minCost,
+          inlandPerKmRate: dbInland.perKmRate,
+        }
+      }
+      // UI 오버라이드 반영 (가장 높은 우선순위)
+      const overrides = containerConfigOverrides[type]
+      if (overrides) {
+        result[type] = { ...result[type], ...overrides }
+      }
+    }
+    return result
+  }, [containerConfigOverrides, containerInlandConfig])
 
   // ===== 설정 모달 =====
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -216,6 +278,38 @@ export function ImportCalculator() {
     setSelectedPresetId(defaultPreset._id)
     setHasLoadedDefaultPreset(true)  // 로드 완료 표시
   }, [defaultPreset, hasLoadedDefaultPreset])
+
+  // FCL 모드: 공장 변경 시 가장 가까운 항구 자동 선택
+  // 📌 비유: 이삿짐 센터에서 "가장 가까운 항구"를 자동 추천해주는 것
+  useEffect(() => {
+    if (!containerMode) return // LCL 모드면 스킵
+
+    if (nearestPorts.length > 0) {
+      // 가장 가까운 항구 자동 선택
+      setSelectedPortId(nearestPorts[0].id)
+      setPortDistanceKm(nearestPorts[0].distanceKm)
+      setPortRoadDistanceKm(null) // 도로 거리는 RouteMap에서 계산
+    } else {
+      setSelectedPortId(null)
+      setPortDistanceKm(null)
+      setPortRoadDistanceKm(null)
+    }
+  }, [containerMode, nearestPorts])
+
+  // 항구 수동 변경 시 직선 거리 업데이트
+  const handlePortChange = useCallback((portId: string) => {
+    setSelectedPortId(portId)
+    setPortRoadDistanceKm(null) // 도로 거리 리셋 (RouteMap에서 재계산)
+
+    const factory = factories?.find((f) => f._id === selectedRouteFactoryId)
+    if (factory?.cityCode) {
+      const coord = getCityCoordinates(factory.cityCode)
+      const port = getPortById(portId)
+      if (coord && port) {
+        setPortDistanceKm(Math.round(calculateDistance(coord, port)))
+      }
+    }
+  }, [factories, selectedRouteFactoryId])
 
   // 제품 개수 변경 시 주문 건수 자동 업데이트
   // 📌 비유: 장바구니에 상품을 담으면 자동으로 배송비 계산 단위가 업데이트되는 것
@@ -329,6 +423,14 @@ export function ImportCalculator() {
         domestic: domesticConfig,
         threePL: threePLConfig,
       },
+      // 컨테이너(FCL) 모드 파라미터
+      containerMode,
+      containerConfig: mergedContainerConfig,
+      deliveryMethod,
+      // FCL 모드: 공장→항구 거리 (도로 거리 우선, 없으면 직선 거리)
+      distanceKm: containerMode
+        ? (portRoadDistanceKm ?? portDistanceKm ?? undefined)
+        : undefined,
     })
   }, [
     products,
@@ -346,6 +448,12 @@ export function ImportCalculator() {
     inlandConfig,
     domesticConfig,
     threePLConfig,
+    // 컨테이너 관련 의존성
+    containerMode,
+    mergedContainerConfig,
+    deliveryMethod,
+    portDistanceKm,
+    portRoadDistanceKm,
   ])
 
   // 설정 모달 열기
@@ -472,6 +580,16 @@ export function ImportCalculator() {
                 onRateTypeChange={setSelectedRateTypeId}
                 onSettingsClick={handleSettingsClick}
                 isLoading={factoriesLoading || warehousesLoading || companiesLoading || rateTypesLoading}
+                // FCL 항구 선택 props
+                containerMode={containerMode}
+                selectedPortId={selectedPortId}
+                onPortChange={handlePortChange}
+                nearestPorts={nearestPorts}
+                portDistanceKm={portDistanceKm}
+                portRoadDistanceKm={portRoadDistanceKm}
+                onPortRoadDistanceChange={setPortRoadDistanceKm}
+                // 오버플로우 시 LCL 경로 설정 노출
+                hasOverflow={calculationResult?.containerComparison?.selectedOption.hasOverflow ?? false}
               />
             </motion.div>
 
@@ -545,6 +663,13 @@ export function ImportCalculator() {
                 threePL: threePLConfig,
               }}
               orderCount={orderCount}
+              // 컨테이너(FCL) 모드 props
+              containerMode={containerMode}
+              onContainerModeChange={setContainerMode}
+              deliveryMethod={deliveryMethod}
+              onDeliveryMethodChange={setDeliveryMethod}
+              containerConfig={mergedContainerConfig}
+              onContainerConfigChange={setContainerConfigOverrides}
             />
           </motion.div>
         </div>

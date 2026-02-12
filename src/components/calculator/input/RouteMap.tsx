@@ -30,11 +30,23 @@ interface SearchPlace {
   address: string
 }
 
+// 항구 마커 타입 (FCL 모드용)
+interface PortMarker {
+  id: string
+  lat: number
+  lng: number
+  label: string
+  isSelected: boolean
+}
+
 interface RouteMapProps {
   departure: MapPoint | null
   destination: MapPoint | null
   // 실제 도로 거리(km) 콜백 (Directions API 결과)
   onDistanceChange?: (distanceKm: number | null) => void
+  // FCL 모드: 항구 마커 목록
+  ports?: PortMarker[]
+  onPortClick?: (portId: string) => void
 }
 
 // Google Maps API 키
@@ -235,6 +247,8 @@ export default function RouteMap({
   departure,
   destination,
   onDistanceChange,
+  ports,
+  onPortClick,
 }: RouteMapProps) {
   // 검색 결과 마커 상태
   const [searchPlace, setSearchPlace] = useState<SearchPlace | null>(null)
@@ -336,6 +350,23 @@ export default function RouteMap({
             />
           </AdvancedMarker>
         )}
+
+        {/* 항구 마커 (FCL 모드) - 비선택 항구는 주황색 작은 마커 */}
+        {ports?.filter((p) => !p.isSelected).map((port) => (
+          <AdvancedMarker
+            key={port.id}
+            position={{ lat: port.lat, lng: port.lng }}
+            title={port.label}
+            onClick={() => onPortClick?.(port.id)}
+          >
+            <Pin
+              background="#F59E0B"
+              glyphColor="#FFFFFF"
+              borderColor="#D97706"
+              scale={0.8}
+            />
+          </AdvancedMarker>
+        ))}
       </Map>
 
       {/* 검색 결과 정보 표시 (지도 아래) */}

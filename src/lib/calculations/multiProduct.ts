@@ -49,6 +49,14 @@ import {
   CostItemInput,
   FactorySlotInput,
 } from "./costs"
+import {
+  calculateContainerOptions,
+  ContainerConfig,
+  DEFAULT_CONTAINER_CONFIG,
+  DeliveryMethod,
+  ContainerType,
+  ContainerCalculationResult,
+} from "./container"
 
 // 다중 제품 계산 입력 파라미터
 export interface CalculateMultiProductParams {
@@ -79,6 +87,14 @@ export interface CalculateMultiProductParams {
     domestic?: DomesticShippingConfig
     threePL?: ThreePLCostConfig
   }
+
+  // ===== 컨테이너(FCL) 모드 파라미터 =====
+  // 📌 비유: "택배(LCL)" vs "이삿짐 트럭(FCL)" 중 선택하는 토글
+  containerMode?: boolean                   // FCL 모드 활성화 여부
+  containerConfig?: ContainerConfig         // 컨테이너별 설정 (비용 등)
+  deliveryMethod?: DeliveryMethod           // 국내 배송 방식 (직배송/3PL 경유)
+  distanceKm?: number                       // 공장→창고 거리 (km)
+  inlandCostOverrides?: Partial<Record<ContainerType, number>> // 내륙운송비 직접 입력
 }
 
 /**
@@ -192,33 +208,77 @@ export function calculateMultiProductImportCost(
     }])
   )
 
-  // ===== 4. 공통 비용 계산 (총 CBM 기준) =====
-  // 내륙 운송료
-  const inlandShippingUSD = calculateInlandShipping(totalCbm, costSettings?.inland)
-  const inlandShippingKRW = Math.round(inlandShippingUSD * exchangeRates.usd)
+  // ===== 4. 공통 비용 계산 =====
+  // 📌 LCL 모드 vs FCL(컨테이너) 모드에 따라 운송비 계산이 달라짐
 
-  // 국제 운송료 (통화별 환율 적용)
-  // 📌 CBM 기반이면 부피(R.TON)로, KG 기반이면 총 중량으로 요금 조회
-  const shippingLookupValue = rateTypeUnitType === "kg" ? totalWeight : totalCbm
-  const shippingResult = findShippingRate(shippingRates, shippingLookupValue, rateTypeUnitType)
-  const internationalShippingRate = shippingResult?.rate ?? 0
+  // 컨테이너 모드 관련 파라미터 추출
+  const {
+    containerMode = false,
+    containerConfig,
+    deliveryMethod = "via3PL",
+    distanceKm,
+    inlandCostOverrides,
+  } = params
 
-  // 통화별 환율 적용하여 원화 계산
+  // 컨테이너 계산 결과 (FCL 모드일 때만 계산)
+  let containerResult: ContainerCalculationResult | null = null
+
+  let inlandShippingKRW: number
   let internationalShippingKRW: number
-  if (rateTypeCurrency === "KRW") {
-    internationalShippingKRW = internationalShippingRate
-  } else if (rateTypeCurrency === "CNY") {
-    internationalShippingKRW = Math.round(internationalShippingRate * exchangeRates.cny)
+  let domesticShippingKRW: number
+  let threePLCostKRW: number
+
+  if (containerMode && containerConfig) {
+    // ===== FCL(컨테이너) 모드 =====
+    // 📌 비유: 이삿짐 트럭을 빌려서 한 번에 보내는 방식
+    containerResult = calculateContainerOptions({
+      totalCbm,
+      totalWeight,
+      containerConfig: containerConfig ?? DEFAULT_CONTAINER_CONFIG,
+      distanceKm,
+      inlandCostOverrides,
+      lclShippingRates: shippingRates,
+      lclRateTypeCurrency: rateTypeCurrency,
+      lclRateTypeUnitType: rateTypeUnitType,
+      exchangeRates,
+      costSettings,
+      deliveryMethod,
+    })
+
+    // 추천 옵션의 비용을 사용
+    const recommended = containerResult.recommendedOption
+    inlandShippingKRW = recommended.containerInlandCost + recommended.overflowInlandCost
+    internationalShippingKRW = recommended.containerShippingCost + recommended.overflowShippingCost
+    domesticShippingKRW = recommended.containerDomesticCost + recommended.overflowDomesticCost
+    threePLCostKRW = recommended.containerThreePLCost + recommended.overflowThreePLCost
   } else {
-    // 기본값 USD
-    internationalShippingKRW = Math.round(internationalShippingRate * exchangeRates.usd)
+    // ===== LCL(소량화물) 모드 — 기존 로직 =====
+    // 내륙 운송료
+    const inlandShippingUSD = calculateInlandShipping(totalCbm, costSettings?.inland)
+    inlandShippingKRW = Math.round(inlandShippingUSD * exchangeRates.usd)
+
+    // 국제 운송료 (통화별 환율 적용)
+    // 📌 CBM 기반이면 부피(R.TON)로, KG 기반이면 총 중량으로 요금 조회
+    const shippingLookupValue = rateTypeUnitType === "kg" ? totalWeight : totalCbm
+    const shippingResult = findShippingRate(shippingRates, shippingLookupValue, rateTypeUnitType)
+    const internationalShippingRate = shippingResult?.rate ?? 0
+
+    // 통화별 환율 적용하여 원화 계산
+    if (rateTypeCurrency === "KRW") {
+      internationalShippingKRW = internationalShippingRate
+    } else if (rateTypeCurrency === "CNY") {
+      internationalShippingKRW = Math.round(internationalShippingRate * exchangeRates.cny)
+    } else {
+      // 기본값 USD
+      internationalShippingKRW = Math.round(internationalShippingRate * exchangeRates.usd)
+    }
+
+    // 국내 운송료
+    domesticShippingKRW = calculateDomesticShipping(totalCbm, costSettings?.domestic)
+
+    // 3PL 비용
+    threePLCostKRW = calculate3PLCost(totalCbm, costSettings?.threePL)
   }
-
-  // 국내 운송료
-  const domesticShippingKRW = calculateDomesticShipping(totalCbm, costSettings?.domestic)
-
-  // 3PL 비용
-  const threePLCostKRW = calculate3PLCost(totalCbm, costSettings?.threePL)
 
   // 송금 수수료 (기준: 전체 제품가격 + 공장비용 + 내륙운송료)
   const totalProductPriceKRW = productsWithTariff.reduce((sum, p) => sum + p.productPriceKRW, 0)
@@ -329,6 +389,58 @@ export function calculateMultiProductImportCost(
   const totalCost = productResults.reduce((sum, p) => sum + p.totalCost, 0)
   const totalTariff = productResults.reduce((sum, p) => sum + p.tariffAmount, 0)
 
+  // 컨테이너 비교 정보 생성 (FCL 모드일 때)
+  const containerComparison = containerResult ? {
+    isContainerMode: true,
+    selectedOption: {
+      type: containerResult.recommendedOption.type,
+      label: containerResult.recommendedOption.label,
+      count: containerResult.recommendedOption.count,
+      isRecommended: containerResult.recommendedOption.isRecommended,
+      usableCbm: containerResult.recommendedOption.usableCbm,
+      loadedCbm: containerResult.recommendedOption.loadedCbm,
+      loadRatio: containerResult.recommendedOption.loadRatio,
+      hasOverflow: containerResult.recommendedOption.hasOverflow,
+      overflowCbm: containerResult.recommendedOption.overflowCbm,
+      weightWarning: containerResult.recommendedOption.weightWarning,
+      containerShippingCost: containerResult.recommendedOption.containerShippingCost,
+      containerInlandCost: containerResult.recommendedOption.containerInlandCost,
+      containerDomesticCost: containerResult.recommendedOption.containerDomesticCost,
+      containerThreePLCost: containerResult.recommendedOption.containerThreePLCost,
+      overflowShippingCost: containerResult.recommendedOption.overflowShippingCost,
+      overflowInlandCost: containerResult.recommendedOption.overflowInlandCost,
+      overflowDomesticCost: containerResult.recommendedOption.overflowDomesticCost,
+      overflowThreePLCost: containerResult.recommendedOption.overflowThreePLCost,
+      totalShippingCost: containerResult.recommendedOption.totalShippingCost,
+    },
+    allOptions: containerResult.allOptions.map(opt => ({
+      type: opt.type,
+      label: opt.label,
+      count: opt.count,
+      isRecommended: opt.isRecommended,
+      usableCbm: opt.usableCbm,
+      loadedCbm: opt.loadedCbm,
+      loadRatio: opt.loadRatio,
+      hasOverflow: opt.hasOverflow,
+      overflowCbm: opt.overflowCbm,
+      weightWarning: opt.weightWarning,
+      containerShippingCost: opt.containerShippingCost,
+      containerInlandCost: opt.containerInlandCost,
+      containerDomesticCost: opt.containerDomesticCost,
+      containerThreePLCost: opt.containerThreePLCost,
+      overflowShippingCost: opt.overflowShippingCost,
+      overflowInlandCost: opt.overflowInlandCost,
+      overflowDomesticCost: opt.overflowDomesticCost,
+      overflowThreePLCost: opt.overflowThreePLCost,
+      totalShippingCost: opt.totalShippingCost,
+    })),
+    lclTotalShipping: containerResult.lclTotalShipping,
+    fclTotalShipping: containerResult.recommendedOption.totalShippingCost,
+    savings: containerResult.savings,
+    savingsPercent: containerResult.savingsPercent,
+    deliveryMethod,
+  } : undefined
+
   return {
     products: productResults,
     totalCbm,      // 전체 R.TON
@@ -355,6 +467,7 @@ export function calculateMultiProductImportCost(
       remittanceFee,
       companyCosts: totalCompanyCostsKRW,
     },
+    containerComparison,
   }
 }
 

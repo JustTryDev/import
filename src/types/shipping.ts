@@ -380,4 +380,44 @@ export interface MultiProductCalculationResult {
     remittanceFee: number         // 송금수수료
     companyCosts: number          // 업체별 공통비용
   }
+
+  // 컨테이너 비교 정보 (FCL 모드일 때만 존재)
+  // 📌 LCL/FCL 토글 시 이 데이터로 비교 패널 표시
+  containerComparison?: {
+    isContainerMode: boolean           // 컨테이너 모드 활성화 여부
+    selectedOption: ContainerOptionSummary  // 현재 적용된 (추천) 옵션
+    allOptions: ContainerOptionSummary[]    // 모든 후보 옵션
+    lclTotalShipping: number           // LCL 총 운송비
+    fclTotalShipping: number           // FCL 총 운송비 (추천 옵션)
+    savings: number                    // 절감액 (양수=절감)
+    savingsPercent: number             // 절감율 (%)
+    deliveryMethod: "direct" | "via3PL" // 국내 배송 방식
+  }
+}
+
+// 컨테이너 옵션 요약 (UI 표시용, ContainerOption에서 필요한 정보만 추출)
+export interface ContainerOptionSummary {
+  type: "20DC" | "40DC" | "40HC"
+  label: string
+  count: number
+  isRecommended: boolean
+  // 적재 정보
+  usableCbm: number
+  loadedCbm: number
+  loadRatio: number
+  // 오버플로우
+  hasOverflow: boolean
+  overflowCbm: number
+  // 경고
+  weightWarning: boolean
+  // 비용 내역
+  containerShippingCost: number
+  containerInlandCost: number
+  containerDomesticCost: number
+  containerThreePLCost: number
+  overflowShippingCost: number
+  overflowInlandCost: number
+  overflowDomesticCost: number
+  overflowThreePLCost: number
+  totalShippingCost: number
 }

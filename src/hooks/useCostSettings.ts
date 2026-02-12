@@ -30,13 +30,21 @@ export interface ThreePLConfig {
   unit: number        // 단위 (CBM)
 }
 
+// 컨테이너 내륙 운송 설정 타입
+// 📌 비유: 컨테이너 규격별 택시 기본요금 + KM당 추가요금 설정
+export interface ContainerInlandConfig {
+  "20DC": { minCost: number; perKmRate: number }  // 20ft: 최소 비용(원), KM당 비용(원)
+  "40DC": { minCost: number; perKmRate: number }  // 40ft
+  "40HC": { minCost: number; perKmRate: number }  // 40ft HC
+}
+
 // 비용 설정 타입
 export interface CostSetting {
   _id: Id<"costSettings">
-  type: "inland" | "domestic" | "3pl"
+  type: "inland" | "domestic" | "3pl" | "containerInland"
   name: string
   description?: string
-  config: InlandConfig | DomesticConfig | ThreePLConfig
+  config: InlandConfig | DomesticConfig | ThreePLConfig | ContainerInlandConfig
   isActive: boolean
   createdAt: number
   updatedAt: number
@@ -53,6 +61,12 @@ const DEFAULT_DOMESTIC: DomesticConfig = {
 const DEFAULT_3PL: ThreePLConfig = {
   ratePerUnit: 15000,
   unit: 0.1,
+}
+// 컨테이너 내륙 운송 기본값 (RMB × 190원/RMB 기준)
+const DEFAULT_CONTAINER_INLAND: ContainerInlandConfig = {
+  "20DC": { minCost: 152_000, perKmRate: 1_520 },   // RMB 800 / RMB 8
+  "40DC": { minCost: 190_000, perKmRate: 1_900 },   // RMB 1,000 / RMB 10
+  "40HC": { minCost: 190_000, perKmRate: 2_090 },   // RMB 1,000 / RMB 11
 }
 
 export function useCostSettings() {
@@ -79,6 +93,11 @@ export function useCostSettings() {
     return setting as CostSetting | undefined
   }, [settings])
 
+  const containerInlandSetting = useMemo(() => {
+    const setting = settings?.find((s) => s.type === "containerInland")
+    return setting as CostSetting | undefined
+  }, [settings])
+
   // 계산용 설정값 (기본값 폴백)
   const inlandConfig = useMemo((): InlandConfig => {
     if (inlandSetting?.config) {
@@ -101,6 +120,13 @@ export function useCostSettings() {
     return DEFAULT_3PL
   }, [threePLSetting])
 
+  const containerInlandConfig = useMemo((): ContainerInlandConfig => {
+    if (containerInlandSetting?.config) {
+      return containerInlandSetting.config as ContainerInlandConfig
+    }
+    return DEFAULT_CONTAINER_INLAND
+  }, [containerInlandSetting])
+
   return {
     // 전체 설정 목록
     settings: settings as CostSetting[] | undefined,
@@ -110,11 +136,13 @@ export function useCostSettings() {
     inlandSetting,
     domesticSetting,
     threePLSetting,
+    containerInlandSetting,
 
     // 계산용 설정값 (기본값 포함)
     inlandConfig,
     domesticConfig,
     threePLConfig,
+    containerInlandConfig,
 
     // 뮤테이션
     updateSetting,

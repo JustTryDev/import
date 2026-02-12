@@ -9,15 +9,18 @@
  * - 3PL + 배송비 (CBM 단위당 요금)
  */
 import { useState } from "react"
-import { Truck, Package, MapPin, Save, RotateCcw } from "lucide-react"
+import { Truck, Package, MapPin, Save, RotateCcw, Container } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useMutation } from "convex/react"
+import { api } from "../../../../convex/_generated/api"
 import { useCostSettings } from "@/hooks"
 import type {
   InlandConfig,
   DomesticConfig,
   ThreePLConfig,
+  ContainerInlandConfig,
 } from "@/hooks/useCostSettings"
 
 export function CostSettingsManager() {
@@ -27,17 +30,23 @@ export function CostSettingsManager() {
     inlandSetting,
     domesticSetting,
     threePLSetting,
+    containerInlandSetting,
     inlandConfig,
     domesticConfig,
     threePLConfig,
+    containerInlandConfig,
     updateSetting,
     seedDefaults,
   } = useCostSettings()
+
+  // Convex create mutation (컨테이너 설정 최초 생성용)
+  const createSetting = useMutation(api.costSettings.create)
 
   // 편집 상태 (로컬)
   const [editInland, setEditInland] = useState<InlandConfig | null>(null)
   const [editDomestic, setEditDomestic] = useState<DomesticConfig | null>(null)
   const [editThreePL, setEditThreePL] = useState<ThreePLConfig | null>(null)
+  const [editContainerInland, setEditContainerInland] = useState<ContainerInlandConfig | null>(null)
 
   // 저장 중 상태
   const [isSaving, setIsSaving] = useState(false)
@@ -82,6 +91,32 @@ export function CostSettingsManager() {
         config: editThreePL,
       })
       setEditThreePL(null)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 컨테이너 내륙 운송 저장
+  const handleSaveContainerInland = async () => {
+    if (!editContainerInland) return
+    setIsSaving(true)
+    try {
+      if (containerInlandSetting) {
+        // 기존 설정 업데이트
+        await updateSetting({
+          id: containerInlandSetting._id,
+          config: editContainerInland,
+        })
+      } else {
+        // 최초 생성
+        await createSetting({
+          type: "containerInland",
+          name: "컨테이너 내륙 운송료",
+          description: "컨테이너 규격별 최소 비용 및 KM당 비용",
+          config: editContainerInland,
+        })
+      }
+      setEditContainerInland(null)
     } finally {
       setIsSaving(false)
     }
@@ -402,6 +437,162 @@ export function CostSettingsManager() {
             Math.ceil(1 / threePLConfig.unit) * threePLConfig.ratePerUnit
           ).toLocaleString()}
           원
+        </p>
+      </div>
+
+      {/* 4. 컨테이너 내륙 운송료 */}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <Container className="h-5 w-5 text-purple-500" />
+          <h4 className="font-medium text-gray-800">컨테이너 내륙 운송료</h4>
+          <span className="text-xs text-gray-400">FCL 모드 전용</span>
+        </div>
+
+        <p className="text-xs text-gray-500 mb-3">
+          컨테이너 규격별 최소 비용과 KM당 비용을 설정합니다. 실제 비용 = max(최소 비용, 거리 × KM당 비용)
+        </p>
+
+        {/* 20ft */}
+        <div className="mb-3">
+          <div className="text-xs font-medium text-gray-600 mb-1.5">20ft (20&apos;DC)</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-gray-500">최소 비용 (원)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatNumber(editContainerInland?.["20DC"]?.minCost ?? containerInlandConfig["20DC"].minCost)}
+                onChange={(e) => {
+                  const current = editContainerInland ?? { ...containerInlandConfig }
+                  setEditContainerInland({
+                    ...current,
+                    "20DC": { ...current["20DC"], minCost: handleNumberInput(e.target.value) },
+                  })
+                }}
+                className="h-8 mt-1 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500">KM당 비용 (원)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatNumber(editContainerInland?.["20DC"]?.perKmRate ?? containerInlandConfig["20DC"].perKmRate)}
+                onChange={(e) => {
+                  const current = editContainerInland ?? { ...containerInlandConfig }
+                  setEditContainerInland({
+                    ...current,
+                    "20DC": { ...current["20DC"], perKmRate: handleNumberInput(e.target.value) },
+                  })
+                }}
+                className="h-8 mt-1 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 40ft */}
+        <div className="mb-3">
+          <div className="text-xs font-medium text-gray-600 mb-1.5">40ft (40&apos;DC)</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-gray-500">최소 비용 (원)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatNumber(editContainerInland?.["40DC"]?.minCost ?? containerInlandConfig["40DC"].minCost)}
+                onChange={(e) => {
+                  const current = editContainerInland ?? { ...containerInlandConfig }
+                  setEditContainerInland({
+                    ...current,
+                    "40DC": { ...current["40DC"], minCost: handleNumberInput(e.target.value) },
+                  })
+                }}
+                className="h-8 mt-1 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500">KM당 비용 (원)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatNumber(editContainerInland?.["40DC"]?.perKmRate ?? containerInlandConfig["40DC"].perKmRate)}
+                onChange={(e) => {
+                  const current = editContainerInland ?? { ...containerInlandConfig }
+                  setEditContainerInland({
+                    ...current,
+                    "40DC": { ...current["40DC"], perKmRate: handleNumberInput(e.target.value) },
+                  })
+                }}
+                className="h-8 mt-1 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 40ft HC */}
+        <div className="mb-3">
+          <div className="text-xs font-medium text-gray-600 mb-1.5">40ft HC (40&apos;HC)</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-gray-500">최소 비용 (원)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatNumber(editContainerInland?.["40HC"]?.minCost ?? containerInlandConfig["40HC"].minCost)}
+                onChange={(e) => {
+                  const current = editContainerInland ?? { ...containerInlandConfig }
+                  setEditContainerInland({
+                    ...current,
+                    "40HC": { ...current["40HC"], minCost: handleNumberInput(e.target.value) },
+                  })
+                }}
+                className="h-8 mt-1 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500">KM당 비용 (원)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatNumber(editContainerInland?.["40HC"]?.perKmRate ?? containerInlandConfig["40HC"].perKmRate)}
+                onChange={(e) => {
+                  const current = editContainerInland ?? { ...containerInlandConfig }
+                  setEditContainerInland({
+                    ...current,
+                    "40HC": { ...current["40HC"], perKmRate: handleNumberInput(e.target.value) },
+                  })
+                }}
+                className="h-8 mt-1 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {editContainerInland && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={handleSaveContainerInland}
+              disabled={isSaving}
+              className="h-9"
+            >
+              <Save className="h-4 w-4 mr-1" />
+              저장
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditContainerInland(null)}
+              className="h-9"
+            >
+              취소
+            </Button>
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-2">
+          예: 20ft 300km 운송 = max({containerInlandConfig["20DC"].minCost.toLocaleString()}원, 300 × {containerInlandConfig["20DC"].perKmRate.toLocaleString()}원) = {Math.max(containerInlandConfig["20DC"].minCost, 300 * containerInlandConfig["20DC"].perKmRate).toLocaleString()}원
         </p>
       </div>
     </div>

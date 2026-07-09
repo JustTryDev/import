@@ -161,7 +161,6 @@ export function calculateImportCost(
 
   // 통화별 환율 적용하여 원화 계산
   let internationalShippingKRW: number
-  let internationalShippingForeign: number = internationalShippingRate  // 외화 금액
   if (rateTypeCurrency === "KRW") {
     internationalShippingKRW = internationalShippingRate
   } else if (rateTypeCurrency === "CNY") {

@@ -330,7 +330,7 @@ export async function GET(): Promise<NextResponse<ExchangeRateResponse>> {
     ])
 
     // 3. 네이버 히스토리로 최근 5일 데이터 구성
-    let history: DailyRate[] = []
+    const history: DailyRate[] = []
 
     if (naverUsdHistory && naverCnyHistory) {
       // USD와 CNY 히스토리를 날짜 기준으로 합치기

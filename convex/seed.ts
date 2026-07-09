@@ -1,4 +1,5 @@
 import { mutation, query, internalMutation } from "./_generated/server"
+import { Id } from "./_generated/dataModel"
 
 // 고포트 운송료 데이터 (0.5 ~ 70.0 CBM)
 const generateGofortRates = () => {
@@ -171,7 +172,7 @@ export const seedInitialData = mutation({
       },
     ]
 
-    const factoryIds: string[] = []
+    const factoryIds: Id<"factories">[] = []
     for (const factory of factories) {
       const factoryId = await ctx.db.insert("factories", {
         ...factory,
@@ -217,7 +218,7 @@ export const seedInitialData = mutation({
     for (const { factoryId, items } of allFactoryCostItems) {
       for (const item of items) {
         await ctx.db.insert("factoryCostItems", {
-          factoryId: factoryId as any,
+          factoryId,
           ...item,
           isActive: true,
           createdAt: now,
